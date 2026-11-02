@@ -77,9 +77,17 @@ class CalendarRelayService : Service() {
     private var lastRingStoppedAt = 0L
     private var lastRingTimedOut = false
 
-    /** Unlocking the phone means the call was reached; the wrist can stop. */
+    /**
+     * Unlocking is NOT a reason to stop ringing. On a phone with face unlock,
+     * an incoming call wakes the screen and unlocks it within a second, which
+     * killed every ring that arrived while the phone was locked. Unlocking to
+     * see who is calling is not the same as dealing with the call; answering
+     * is caught by the audio mode and by the notification going away.
+     */
     private val userPresentReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) = stopRing("unlocked")
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (ring != null) Log.i(TAG, "unlocked while ringing; ring continues")
+        }
     }
 
     override fun onCreate() {
@@ -248,13 +256,26 @@ class CalendarRelayService : Service() {
     internal fun onAlert(packageName: String, key: String, postedAt: Long, ongoing: Boolean, summary: Boolean, messageTimestamp: Long?, conversationIds: Set<String>, tone: RelayTone? = null, kind: RelayAlertKind = RelayAlertKind.MESSAGE) {
         if (!ready || stopping) return
         val now = System.currentTimeMillis()
-        if (filter?.accept(packageName, key, postedAt, now, ongoing, summary, messageTimestamp, kind) != true) return
+        if (filter?.accept(packageName, key, postedAt, now, ongoing, summary, messageTimestamp, kind) != true) {
+            Log.i(TAG, "dropped pkg=$packageName kind=$kind by=filter " +
+                "age=${now - postedAt}ms ongoing=$ongoing summary=$summary")
+            return
+        }
         val config = RelayRuleStore.read(this)
         val match = config.match(packageName, conversationIds, tone, kind)
         val category = tone?.takeIf { config.tone.enabled }
-        if (match == null) { record(nextId(), packageName, postedAt, "filtered", tone = category); return }
+        if (match == null) {
+            Log.i(TAG, "dropped pkg=$packageName kind=$kind by=rule (silent or app off)")
+            record(nextId(), packageName, postedAt, "filtered", tone = category)
+            return
+        }
         val silence = config.silence.reason(now)
-        if (silence != null) { cancelWaiting(silence); record(nextId(), packageName, postedAt, silence, tone = category); return }
+        if (silence != null) {
+            Log.i(TAG, "dropped pkg=$packageName kind=$kind by=$silence")
+            cancelWaiting(silence)
+            record(nextId(), packageName, postedAt, silence, tone = category)
+            return
+        }
         // One ring at a time, and nothing else buzzes during it: a message pulse
         // in the middle of a ring is indistinguishable from the ring itself.
         Log.i(TAG, "alert pkg=$packageName kind=$kind ongoing=$ongoing preset=${match.preset.id}")

@@ -1237,6 +1237,10 @@ class FitbitAirPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHa
             val body = AirHapticSettings.tap(target)
             var pulses = 0
             fun pulse(): Single<Int> = Single.defer {
+                // Checked here, not only after the gap: a stop that lands while
+                // a pulse is being prepared must not still buzz the wrist after
+                // the call is over.
+                if (!ringing()) return@defer Single.just(pulses)
                 val sentAt = SystemClock.elapsedRealtime()
                 postSettings(coap, body).map {
                     pulses++

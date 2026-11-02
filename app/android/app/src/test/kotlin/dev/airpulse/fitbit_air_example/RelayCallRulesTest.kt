@@ -73,6 +73,15 @@ class RelayCallRulesTest {
         assertNull(config.match("com.whatsapp", emptySet(), null, RelayAlertKind.CALL))
     }
 
+    @Test fun `a call grouped under a summary still rings`() {
+        // WhatsApp posts its VOIP notification inside a notification group;
+        // rejecting group summaries silenced every WhatsApp call.
+        val filter = CalendarAlertFilter(0, emptyMap(), setOf("com.whatsapp"))
+        assertTrue(filter.accept("com.whatsapp", "voip", 10, 20, true, true, null, RelayAlertKind.CALL))
+        // A grouped message summary is still noise.
+        assertFalse(filter.accept("com.whatsapp", "chat", 10, 20, false, true, null))
+    }
+
     @Test fun `the ring filter accepts an ongoing call but still drops other sticky alerts`() {
         val filter = CalendarAlertFilter(0, emptyMap(), setOf("com.whatsapp"))
         assertTrue(filter.accept("com.whatsapp", "call-key", 10, 20, true, false, null, RelayAlertKind.CALL))

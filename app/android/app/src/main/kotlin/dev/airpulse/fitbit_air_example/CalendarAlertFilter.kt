@@ -11,16 +11,18 @@ internal class CalendarAlertFilter(
     fun accept(packageName: String, key: String, postedAt: Long, now: Long,
                ongoing: Boolean, summary: Boolean, messageTimestamp: Long? = null,
                kind: RelayAlertKind = RelayAlertKind.MESSAGE): Boolean {
-        // A ringing call is ongoing by design; every other sticky notification
-        // is still ignored.
-        val stickyBlocks = ongoing && kind != RelayAlertKind.CALL
-        if (packageName !in selectedPackages || stickyBlocks || summary ||
+        if (packageName !in selectedPackages ||
             postedAt < startedAt || postedAt > now || now - postedAt >= 30_000) return false
-        // Calls skip the message dedupe entirely. A dialer reuses one key for
-        // every call and a call carries no message timestamp, so `seen` lets
-        // the first call through and silences every later one. Re-posts while
-        // a call rings are absorbed by the ring that is already running.
+        // Everything below is message hygiene, and a ringing call is exempt
+        // from all of it:
+        //  - sticky: a ringing call holds its notification up by design;
+        //  - summary: WhatsApp posts its call inside a notification group;
+        //  - dedupe: a dialer reuses one key for every call and a call has no
+        //    message timestamp, so `seen` would let the first call through and
+        //    silence every later one.
+        // Re-posts while a call rings are absorbed by the ring already running.
         if (kind == RelayAlertKind.CALL) return true
+        if (ongoing || summary) return false
         if (seen.containsKey(key)) {
             // Messaging apps reuse chat IDs. Only a strictly newer message can buzz again.
             val previous = seen[key]
