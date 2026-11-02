@@ -5,12 +5,26 @@ enum VibrationPreset {
   low('low', 'One pulse · Low', 'The band keeps low strength afterward'),
   high('high', 'One pulse · High', 'The band keeps high strength afterward'),
   doublePulse('double', 'Two pulses', 'Restores your original strength'),
+  ring(
+    'ring',
+    'Repeat until answered',
+    'One pulse every few seconds while the call rings',
+    callsOnly: true,
+  ),
   mute('mute', 'Silent', 'No vibration for this chat');
 
-  const VibrationPreset(this.id, this.label, this.description);
+  const VibrationPreset(
+    this.id,
+    this.label,
+    this.description, {
+    this.callsOnly = false,
+  });
   final String id;
   final String label;
   final String description;
+
+  /// A repeat has nothing to stop it unless a call is still ringing.
+  final bool callsOnly;
   HapticIntensity? get intensity => switch (this) {
     low => HapticIntensity.low,
     high => HapticIntensity.high,
@@ -21,9 +35,16 @@ enum VibrationPreset {
 }
 
 class AppNotificationRule {
-  const AppNotificationRule({required this.enabled, this.preset});
+  const AppNotificationRule({
+    required this.enabled,
+    this.preset,
+    this.callPreset,
+  });
   final bool enabled;
   final VibrationPreset? preset;
+
+  /// Null uses [RelaySettings.defaultCallPreset] for this app's calls.
+  final VibrationPreset? callPreset;
 }
 
 /// A WhatsApp chat saved on this phone. [preset] null uses the app vibration.
@@ -56,6 +77,9 @@ class SavedChat {
 class RelaySettings {
   const RelaySettings({
     this.defaultPreset = VibrationPreset.single,
+    this.defaultCallPreset = VibrationPreset.ring,
+    this.ringIntervalSeconds = 6,
+    this.ringMaxSeconds = 45,
     this.apps = const {},
     this.chats = const [],
     this.everyoneElseSilent = false,
@@ -70,6 +94,13 @@ class RelaySettings {
     this.toneNeutral,
   });
   final VibrationPreset defaultPreset;
+
+  /// Used for calls from apps without their own call vibration.
+  final VibrationPreset defaultCallPreset;
+
+  /// Seconds between pulses while a call rings, and when the ring gives up.
+  final int ringIntervalSeconds;
+  final int ringMaxSeconds;
   final Map<String, AppNotificationRule> apps;
   final List<SavedChat> chats;
 
@@ -93,6 +124,11 @@ class RelaySettings {
         value == null ? null : VibrationPreset.parse(value);
     return RelaySettings(
       defaultPreset: VibrationPreset.parse(map['defaultPreset']),
+      defaultCallPreset: map['defaultCallPreset'] == null
+          ? VibrationPreset.ring
+          : VibrationPreset.parse(map['defaultCallPreset']),
+      ringIntervalSeconds: map['ringIntervalSeconds'] as int? ?? 6,
+      ringMaxSeconds: map['ringMaxSeconds'] as int? ?? 45,
       apps: appMap.map((key, value) {
         final rule = value as Map;
         return MapEntry(
@@ -102,6 +138,9 @@ class RelaySettings {
             preset: rule['preset'] == null
                 ? null
                 : VibrationPreset.parse(rule['preset']),
+            callPreset: rule['callPreset'] == null
+                ? null
+                : VibrationPreset.parse(rule['callPreset']),
           ),
         );
       }),

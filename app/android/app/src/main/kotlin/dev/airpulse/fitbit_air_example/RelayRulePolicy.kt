@@ -4,14 +4,23 @@ import java.util.Calendar
 import java.util.TimeZone
 
 internal enum class RelayPreset(val id: String, val intensity: Int? = null) {
-    CURRENT("single"), LOW("low", 2), HIGH("high", 3), DOUBLE("double"), MUTE("mute");
+    CURRENT("single"), LOW("low", 2), HIGH("high", 3), DOUBLE("double"), RING("ring"), MUTE("mute");
+
+    /** A repeating pulse only makes sense while something is still ringing. */
+    val callsOnly: Boolean get() = this == RING
+
     companion object {
         fun parse(id: String): RelayPreset = entries.firstOrNull { it.id == id }
             ?: throw IllegalArgumentException("Unknown vibration preset")
     }
 }
 
-internal data class RelayAppRule(val enabled: Boolean, val preset: RelayPreset? = null)
+/** [callPreset] null uses [RelayRuleConfig.defaultCallPreset] for this app's calls. */
+internal data class RelayAppRule(
+    val enabled: Boolean,
+    val preset: RelayPreset? = null,
+    val callPreset: RelayPreset? = null,
+)
 /**
  * A WhatsApp chat the user saved. [kind] is "shortcut" (stable conversation ID) or
  * "name" (exact chat name); [preset] null uses the app vibration. Labels stay on this phone.
@@ -59,15 +68,29 @@ internal data class RelaySilence(
 
 internal data class RelayRuleConfig(
     val defaultPreset: RelayPreset = RelayPreset.CURRENT,
+    val defaultCallPreset: RelayPreset = RelayPreset.RING,
     val apps: Map<String, RelayAppRule> = emptyMap(),
     val chats: Map<String, SavedChat> = emptyMap(),
     val silence: RelaySilence = RelaySilence(),
     val tone: RelayToneRules = RelayToneRules(),
+    val ring: RelayRingSettings = RelayRingSettings(),
     val everyoneElseSilent: Boolean = false,
 ) {
     val selectedPackages: Set<String> get() = apps.filterValues { it.enabled }.keys
-    fun match(packageName: String, identities: Set<String>, tone: RelayTone? = null): RelayMatch? {
+
+    fun match(
+        packageName: String,
+        identities: Set<String>,
+        tone: RelayTone? = null,
+        kind: RelayAlertKind = RelayAlertKind.MESSAGE,
+    ): RelayMatch? {
         val app = apps[packageName]?.takeIf { it.enabled } ?: return null
+        if (kind == RelayAlertKind.CALL) {
+            // A call is from whoever is calling: saved-chat, burst and tone rules
+            // all describe messages and never apply here.
+            val preset = app.callPreset ?: defaultCallPreset
+            return if (preset == RelayPreset.MUTE) null else RelayMatch(preset, 2)
+        }
         val whatsapp = packageName in RelayConversationPolicy.packages
         val saved = if (whatsapp) identities.mapNotNull { chats[it] } else emptyList()
         // "Everyone else: Silent" lets only saved chats through.

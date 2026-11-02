@@ -14,6 +14,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -49,17 +50,44 @@ class CalendarRelayService : Service() {
         override fun onReceive(context: Context?, intent: Intent?) { settingsChanged() }
     }
 
+    /** One call ringing on the Air. [key] is the notification that started it. */
+    private class RingSession(
+        val key: String,
+        val packageName: String,
+        val match: RelayMatch,
+        val startedAt: Long,
+        /**
+         * The audio mode when the ring began. Some apps already hold the audio
+         * session while they are still ringing, so only a *change* into an
+         * in-call mode means the call was picked up.
+         */
+        val startMode: Int,
+    )
+
+    private var ring: RingSession? = null
+    private var ringSettings = RelayRingSettings()
+    private val ringTick = Runnable { sendRing() }
+
+    /** Unlocking the phone means the call was reached; the wrist can stop. */
+    private val userPresentReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) = stopRing("unlocked")
+    }
+
     override fun onCreate() {
         super.onCreate()
         val filter = IntentFilter().apply { addAction(Intent.ACTION_TIME_CHANGED); addAction(Intent.ACTION_TIMEZONE_CHANGED) }
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(clockReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         else @Suppress("DEPRECATION") registerReceiver(clockReceiver, filter)
+        val present = IntentFilter(Intent.ACTION_USER_PRESENT)
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(userPresentReceiver, present, Context.RECEIVER_NOT_EXPORTED)
+        else @Suppress("DEPRECATION") registerReceiver(userPresentReceiver, present)
     }
 
     fun settingsChanged() {
         val config = RelayRuleStore.read(this)
         val packages = config.selectedPackages
         toneEnabled = config.tone.enabled
+        ringSettings = config.ring
         if (toneEnabled) RelayToneLexicons.preload(this)
         if (packages != selectedPackages) {
             selectedPackages = packages
@@ -89,12 +117,29 @@ class CalendarRelayService : Service() {
         val pause = PendingIntent.getService(this, 2, Intent(this, CalendarRelayService::class.java)
             .setAction(if (silence == "paused") RESUME else PAUSE), flags)
         val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(this, CHANNEL) else @Suppress("DEPRECATION") Notification.Builder(this)
-        return builder.setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+        builder.setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentTitle("Air Relay")
-            .setContentText(when(silence) { "paused" -> "Paused · No notification vibrations"; "quiet_hours" -> "Quiet hours · No notification vibrations"; else -> "Listening for your notification rules" })
+            .setContentText(when {
+                ring != null -> "Ringing your Air · tap Silence to stop"
+                silence == "paused" -> "Paused · No notification vibrations"
+                silence == "quiet_hours" -> "Quiet hours · No notification vibrations"
+                else -> "Listening for your notification rules"
+            })
             .setContentIntent(open).setOngoing(true)
+        // Silencing a ring is the only useful action while the wrist is buzzing.
+        if (ring != null) {
+            val silenceRing = PendingIntent.getService(this, 3, Intent(this, CalendarRelayService::class.java).setAction(SILENCE), flags)
+            return builder.addAction(Notification.Action.Builder(null, "Silence", silenceRing).build())
+                .addAction(Notification.Action.Builder(null, "Stop", stop).build()).build()
+        }
+        return builder
             .addAction(Notification.Action.Builder(null, if (silence == "paused") "Resume" else "Pause 15 min", pause).build())
             .addAction(Notification.Action.Builder(null, "Stop", stop).build()).build()
+    }
+
+    private fun refreshNotification() {
+        if (!ready) return
+        runCatching { getSystemService(NotificationManager::class.java).notify(902, buildNotification()) }
     }
     private val handler = Handler(Looper.getMainLooper())
     private val coalescer = RelayCoalescer()
@@ -115,6 +160,11 @@ class CalendarRelayService : Service() {
         }
         if (intent?.action == STOP) {
             requestStop("Relay stopped.")
+            return START_NOT_STICKY
+        }
+        if (intent?.action == SILENCE) {
+            stopRing("silenced")
+            if (engine == null) stopSelf()
             return START_NOT_STICKY
         }
         if (intent?.action == PAUSE || intent?.action == RESUME) {
@@ -186,17 +236,103 @@ class CalendarRelayService : Service() {
 
     fun acceptsPackage(packageName: String): Boolean = ready && !stopping && packageName in selectedPackages
 
-    internal fun onAlert(packageName: String, key: String, postedAt: Long, ongoing: Boolean, summary: Boolean, messageTimestamp: Long?, conversationIds: Set<String>, tone: RelayTone? = null) {
+    internal fun onAlert(packageName: String, key: String, postedAt: Long, ongoing: Boolean, summary: Boolean, messageTimestamp: Long?, conversationIds: Set<String>, tone: RelayTone? = null, kind: RelayAlertKind = RelayAlertKind.MESSAGE) {
         if (!ready || stopping) return
         val now = System.currentTimeMillis()
-        if (filter?.accept(packageName, key, postedAt, now, ongoing, summary, messageTimestamp) != true) return
+        if (filter?.accept(packageName, key, postedAt, now, ongoing, summary, messageTimestamp, kind) != true) return
         val config = RelayRuleStore.read(this)
-        val match = config.match(packageName, conversationIds, tone)
+        val match = config.match(packageName, conversationIds, tone, kind)
         val category = tone?.takeIf { config.tone.enabled }
         if (match == null) { record(nextId(), packageName, postedAt, "filtered", tone = category); return }
         val silence = config.silence.reason(now)
         if (silence != null) { cancelWaiting(silence); record(nextId(), packageName, postedAt, silence, tone = category); return }
+        // One ring at a time, and nothing else buzzes during it: a message pulse
+        // in the middle of a ring is indistinguishable from the ring itself.
+        if (ring != null) { record(nextId(), packageName, postedAt, "ringing", tone = category); return }
+        if (match.preset == RelayPreset.RING) { startRing(key, packageName, match); return }
         submit(packageName, postedAt, match)
+    }
+
+    /** A ring stops when the call is answered, declined, cleared, or times out. */
+    internal fun onAlertRemoved(key: String) {
+        if (ring?.key == key) stopRing("cleared")
+    }
+
+    /**
+     * Answering usually rewrites the ringing notification in place rather than
+     * removing it: same key, but no longer a ringing call. That update is the
+     * fastest answer signal there is for an app that held the audio session
+     * while it rang.
+     */
+    internal fun onAlertUpdate(key: String, kind: RelayAlertKind) {
+        if (ring?.key == key && kind != RelayAlertKind.CALL) stopRing("answered")
+    }
+
+    private fun startRing(key: String, packageName: String, match: RelayMatch) {
+        val session = RingSession(key, packageName, match, System.currentTimeMillis(), audioMode())
+        ring = session
+        record(nextId(), packageName, session.startedAt, "ring_started", match = match)
+        refreshNotification()
+        sendRing()
+    }
+
+    private fun stopRing(reason: String) {
+        val session = ring ?: return
+        ring = null
+        handler.removeCallbacks(ringTick)
+        record(nextId(), session.packageName, session.startedAt, "ring_stopped", reason, session.match)
+        // Give Google Health the usual quiet window now that the ring is over.
+        coalescer.onFinished(System.currentTimeMillis())
+        refreshNotification()
+    }
+
+    private fun audioMode(): Int = runCatching {
+        getSystemService(AudioManager::class.java).mode
+    }.getOrDefault(AudioManager.MODE_NORMAL)
+
+    private fun inCallMode(mode: Int) =
+        mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION
+
+    /** True once this call was picked up, including WhatsApp and Instagram calls. */
+    private fun answered(session: RingSession): Boolean =
+        inCallMode(audioMode()) && !inCallMode(session.startMode)
+
+    private fun sendRing() {
+        val session = ring ?: return
+        if (stopping || !ready) { stopRing("cancelled"); return }
+        val now = System.currentTimeMillis()
+        if (now - session.startedAt >= ringSettings.maxMillis) { stopRing("ring_timeout"); return }
+        if (answered(session)) { stopRing("answered"); return }
+        RelayRuleStore.read(this).silence.reason(now)?.let { stopRing(it); return }
+        val id = nextId()
+        begin()
+        refreshDeadline()
+        inFlight[id] = session.packageName to session.startedAt
+        record(id, session.packageName, session.startedAt, "queued", match = session.match)
+        fun finished(result: RelayWorkerResult) {
+            inFlight.remove(id)
+            record(id, session.packageName, session.startedAt, result.stage, result.errorCode, session.match)
+            saveOutcome("Ring ${result.stage}${result.errorCode?.let { ": $it" } ?: ""}.")
+            end()
+            // The next pulse is scheduled from the end of this one, so sessions
+            // never overlap however long the handshake took.
+            if (ring === session && !stopping) handler.postDelayed(ringTick, ringSettings.intervalMillis)
+        }
+        // A pulse that could not be delivered within one interval is stale: the
+        // next tick replaces it rather than queueing a buzz after the call ends.
+        val worker = channel
+        if (worker == null) {
+            finished(RelayWorkerResult("failed", "WORKER_UNAVAILABLE"))
+            return
+        }
+        worker.invokeMethod("dispatch", mapOf(
+            "id" to id, "expiresAt" to now + ringSettings.intervalMillis,
+            "kind" to "tap", "intensity" to session.match.preset.intensity
+        ), object : MethodChannel.Result {
+            override fun success(result: Any?) { finished(RelayWorkerResult.decode(result)) }
+            override fun error(code: String, message: String?, details: Any?) { finished(RelayWorkerResult("failed", "WORKER_ERROR")) }
+            override fun notImplemented() { finished(RelayWorkerResult("failed", "WORKER_UNAVAILABLE")) }
+        })
     }
 
     internal fun testPulse(preset: String? = null, completion: ((RelayWorkerResult) -> Unit)? = null) {
@@ -204,7 +340,7 @@ class CalendarRelayService : Service() {
         val config = RelayRuleStore.read(this)
         check(config.silence.reason(System.currentTimeMillis()) == null) { "Resume the relay or leave quiet hours before trying a vibration." }
         val selected = preset?.let { RelayPreset.parse(it) } ?: config.defaultPreset
-        require(selected != RelayPreset.MUTE)
+        require(selected != RelayPreset.MUTE && !selected.callsOnly) { "Choose a vibration to try." }
         submit(null, System.currentTimeMillis(), RelayMatch(selected, 2), completion)
     }
 
@@ -350,6 +486,7 @@ class CalendarRelayService : Service() {
 
     fun requestStop(reason: String) {
         stopping = true
+        stopRing("cancelled")
         saveOutcome(reason)
         channel?.invokeMethod("close", null)
         handler.removeCallbacks(silenceTick)
@@ -370,7 +507,10 @@ class CalendarRelayService : Service() {
         val replies = previewReplies.values.toList()
         previewReplies.clear()
         replies.forEach { it(RelayWorkerResult("failed", "SERVICE_STOPPED")) }
+        ring = null
+        handler.removeCallbacks(ringTick)
         unregisterReceiver(clockReceiver)
+        unregisterReceiver(userPresentReceiver)
         handler.removeCallbacks(silenceTick)
         if (active === this) active = null
         handler.removeCallbacks(watchdog)
@@ -421,6 +561,7 @@ class CalendarRelayService : Service() {
 
         private const val CHANNEL = "calendar_relay"
         private const val STOP = "calendar_relay.STOP"
+        private const val SILENCE = "calendar_relay.SILENCE"
         private const val PAUSE = "calendar_relay.PAUSE"
         private const val RESUME = "calendar_relay.RESUME"
         var active: CalendarRelayService? = null
@@ -444,6 +585,7 @@ class CalendarRelayService : Service() {
             "running" to isRunning,
             "ready" to (active?.ready == true),
             "stopping" to (active?.stopping == true),
+            "ringing" to (active?.ring != null),
             "selectedApps" to RelayRuleStore.read(context).selectedPackages.sorted(),
             "pulseStyle" to RelayRuleStore.read(context).defaultPreset.id,
             "rules" to RelayRuleStore.status(context),

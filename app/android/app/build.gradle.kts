@@ -19,7 +19,9 @@ fun releaseSetting(name: String, env: String): String? =
 android {
     namespace = "dev.airpulse.fitbit_air_example"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // No module here compiles native code: the Air transport ships prebuilt
+    // .so files in the plugin's jniLibs. Pinning Flutter's NDK would make
+    // every build download ~2.5 GB of toolchain for nothing.
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

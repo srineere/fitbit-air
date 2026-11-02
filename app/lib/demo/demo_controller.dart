@@ -725,12 +725,25 @@ class DemoController extends ChangeNotifier {
   Future<void> saveAppRule(
     String packageName,
     bool enabled,
-    VibrationPreset? preset,
-  ) => _relayCall('saveAppRule', {
+    VibrationPreset? preset, [
+    VibrationPreset? callPreset,
+  ]) => _relayCall('saveAppRule', {
     'packageName': packageName,
     'enabled': enabled,
     'preset': preset?.id,
+    'callPreset': callPreset?.id,
   });
+
+  /// Applies to calls from apps without their own call vibration.
+  Future<void> saveDefaultCallPreset(VibrationPreset preset) =>
+      _relayCall('saveDefaultCallPreset', {'preset': preset.id});
+
+  /// How often a ringing call pulses, and when it gives up.
+  Future<void> saveRingSettings(int intervalSeconds, int maxSeconds) =>
+      _relayCall('saveRingSettings', {
+        'intervalSeconds': intervalSeconds,
+        'maxSeconds': maxSeconds,
+      });
 
   /// Adds a found chat, or changes a saved chat's vibration. Applies while the relay runs.
   Future<void> saveChat(String id, VibrationPreset? preset) =>

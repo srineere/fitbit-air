@@ -10,6 +10,7 @@ Future<void> editVibration(
   required Future<void> Function(VibrationPreset?) onSave,
   bool allowDefault = true,
   bool allowMute = false,
+  bool allowRing = false,
   VibrationPreset? inheritedPreset,
   String inheritLabel = 'Use default vibration',
 }) => showModalBottomSheet<void>(
@@ -23,6 +24,7 @@ Future<void> editVibration(
     onSave: onSave,
     allowDefault: allowDefault,
     allowMute: allowMute,
+    allowRing: allowRing,
     inheritedPreset: inheritedPreset,
     inheritLabel: inheritLabel,
   ),
@@ -36,6 +38,7 @@ class _VibrationEditor extends StatefulWidget {
     required this.onSave,
     required this.allowDefault,
     required this.allowMute,
+    required this.allowRing,
     required this.inheritedPreset,
     required this.inheritLabel,
   });
@@ -43,7 +46,7 @@ class _VibrationEditor extends StatefulWidget {
   final String title;
   final VibrationPreset? initial;
   final Future<void> Function(VibrationPreset?) onSave;
-  final bool allowDefault, allowMute;
+  final bool allowDefault, allowMute, allowRing;
   final VibrationPreset? inheritedPreset;
   final String inheritLabel;
   @override
@@ -137,7 +140,9 @@ class _VibrationEditorState extends State<_VibrationEditor> {
               onTap: working ? null : () => setState(() => selected = null),
             ),
           for (final preset in VibrationPreset.values.where(
-            (p) => widget.allowMute || p != VibrationPreset.mute,
+            (p) =>
+                (widget.allowMute || p != VibrationPreset.mute) &&
+                (widget.allowRing || !p.callsOnly),
           ))
             ListTile(
               key: ValueKey('preset-${preset.id}'),
@@ -167,7 +172,8 @@ class _VibrationEditorState extends State<_VibrationEditor> {
                     widget.controller.changingRelay ||
                     (widget.controller.relayRunning &&
                         widget.controller.settings.silenceReason != null) ||
-                    effective == VibrationPreset.mute
+                    effective == VibrationPreset.mute ||
+                    effective.callsOnly
                 ? null
                 : () => run(() => widget.controller.previewPreset(effective)),
             icon: working
@@ -178,6 +184,13 @@ class _VibrationEditorState extends State<_VibrationEditor> {
                 : const Icon(Icons.vibration),
             label: Text(working ? 'Working…' : 'Try this vibration'),
           ),
+          if (effective.callsOnly)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'A repeat only runs while a call is actually ringing, so there is nothing to try here. Each pulse opens its own connection to the Air, so expect one buzz every few seconds rather than a continuous ring.',
+              ),
+            ),
           if (widget.controller.relayRunning &&
               widget.controller.settings.silenceReason != null)
             const Text(

@@ -105,7 +105,19 @@ class MainActivity : FlutterActivity() {
                             val pkg = requireNotNull(call.argument<String>("packageName"))
                             val enabled = requireNotNull(call.argument<Boolean>("enabled"))
                             val preset = call.argument<String>("preset")?.let { RelayPreset.parse(it) }
-                            RelayRuleStore.update(this) { it.copy(apps = it.apps + (pkg to RelayAppRule(enabled, preset))) }
+                            val callPreset = call.argument<String>("callPreset")?.let { RelayPreset.parse(it) }
+                            RelayRuleStore.update(this) { it.copy(apps = it.apps + (pkg to RelayAppRule(enabled, preset, callPreset))) }
+                            result.success(null)
+                        }
+                        "saveDefaultCallPreset" -> {
+                            val preset = RelayPreset.parse(requireNotNull(call.argument<String>("preset")))
+                            RelayRuleStore.update(this) { it.copy(defaultCallPreset = preset) }
+                            result.success(null)
+                        }
+                        "saveRingSettings" -> {
+                            val interval = requireNotNull(call.argument<Int>("intervalSeconds"))
+                            val max = requireNotNull(call.argument<Int>("maxSeconds"))
+                            RelayRuleStore.update(this) { it.copy(ring = RelayRingSettings(interval, max)) }
                             result.success(null)
                         }
                         "saveChat" -> {

@@ -39,12 +39,19 @@ class CalendarNotificationListener : NotificationListenerService() {
                 RelayNotificationSignals.from(sbn.notification, ranking, System.currentTimeMillis()),
                 RelayToneLexicons.shared(this))
         }.getOrNull()
+        val kind = RelayAlertClassifier.classify(sbn.notification, sbn.isOngoing)
+        relay.onAlertUpdate(sbn.key, kind)
         relay.onAlert(
             sbn.packageName, sbn.key, sbn.postTime, sbn.isOngoing,
             sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0,
             latestMessageTimestamp(sbn.notification),
-            RelayConversations.identities(sbn.packageName, sbn.notification), tone
+            RelayConversations.identities(sbn.packageName, sbn.notification), tone, kind
         )
+    }
+
+    /** A ring stops when the app that was ringing takes its notification back. */
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        CalendarRelayService.active?.onAlertRemoved(sbn.key)
     }
 
     companion object {

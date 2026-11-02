@@ -6,14 +6,16 @@ import org.json.JSONObject
 
 class RelayRuleStoreTest {
     @Test fun `settings round trip preserves inheritance mute pause and quiet window`() {
-        val expected = RelayRuleConfig(RelayPreset.DOUBLE,
-            mapOf("com.whatsapp" to RelayAppRule(true, RelayPreset.LOW), "com.calendar" to RelayAppRule(false)),
+        val expected = RelayRuleConfig(RelayPreset.DOUBLE, RelayPreset.MUTE,
+            mapOf("com.whatsapp" to RelayAppRule(true, RelayPreset.LOW, RelayPreset.RING),
+                "com.calendar" to RelayAppRule(false)),
             mapOf("private-chat-hash" to SavedChat("com.whatsapp", "Chat", "name", RelayPreset.MUTE),
                 "other-hash" to SavedChat("com.whatsapp.w4b", "Shop")),
-            RelaySilence(-1, true, 540, 1020), everyoneElseSilent = true)
+            RelaySilence(-1, true, 540, 1020), ring = RelayRingSettings(9, 120), everyoneElseSilent = true)
         val actual = RelayRuleStore.decode(JSONObject(RelayRuleStore.encode(expected).toString()))
         assertEquals(expected, actual)
         assertNull(actual.apps["com.calendar"]!!.preset)
+        assertNull(actual.apps["com.calendar"]!!.callPreset)
         assertTrue(actual.apps["com.whatsapp"]!!.enabled)
     }
     @Test fun `tone rules round trip and older configs decode with tone off`() {
@@ -23,8 +25,18 @@ class RelayRuleStoreTest {
         assertEquals(RelayToneRules(), RelayRuleStore.decode(legacy).tone)
     }
     @Test(expected = IllegalArgumentException::class) fun `newer schema is not treated as an empty default`() {
-        val json = RelayRuleStore.encode(RelayRuleConfig()).put("version", 3)
+        val json = RelayRuleStore.encode(RelayRuleConfig()).put("version", 4)
         RelayRuleStore.decode(json)
+    }
+    @Test fun `configs saved before calls could ring decode with the shipped call defaults`() {
+        val legacy = RelayRuleStore.encode(RelayRuleConfig(RelayPreset.LOW)).apply {
+            put("version", 2)
+            remove("defaultCallPreset")
+            remove("ring")
+        }
+        val config = RelayRuleStore.decode(legacy)
+        assertEquals(RelayPreset.RING, config.defaultCallPreset)
+        assertEquals(RelayRingSettings(), config.ring)
     }
     @Test fun `version 1 merges the separately saved chats and Selected mode`() {
         val json = RelayRuleStore.encode(RelayRuleConfig()).put("version", 1)

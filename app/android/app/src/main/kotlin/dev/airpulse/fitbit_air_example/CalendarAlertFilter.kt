@@ -9,8 +9,13 @@ internal class CalendarAlertFilter(
     private val seen = existingKeys.entries.take(256).associate { it.key to it.value }.toMutableMap()
 
     fun accept(packageName: String, key: String, postedAt: Long, now: Long,
-               ongoing: Boolean, summary: Boolean, messageTimestamp: Long? = null): Boolean {
-        if (packageName !in selectedPackages || ongoing || summary ||
+               ongoing: Boolean, summary: Boolean, messageTimestamp: Long? = null,
+               kind: RelayAlertKind = RelayAlertKind.MESSAGE): Boolean {
+        // A ringing call is ongoing by design; every other sticky notification
+        // is still ignored. A ringing app re-posts the same key while it rings,
+        // which `seen` collapses: the ring session, not the filter, repeats it.
+        val stickyBlocks = ongoing && kind != RelayAlertKind.CALL
+        if (packageName !in selectedPackages || stickyBlocks || summary ||
             postedAt < startedAt || postedAt > now || now - postedAt >= 30_000) return false
         if (seen.containsKey(key)) {
             // Messaging apps reuse chat IDs. Only a strictly newer message can buzz again.

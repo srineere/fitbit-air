@@ -86,6 +86,40 @@ class _RulesPanelState extends State<RulesPanel> {
         const SizedBox(height: 12),
         ListTile(
           contentPadding: EdgeInsets.zero,
+          key: const ValueKey('default-call-vibration'),
+          leading: const Icon(Icons.call),
+          title: const Text('Default call vibration'),
+          subtitle: Text(state.settings.defaultCallPreset.label),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => editVibration(
+            context,
+            state,
+            title: 'Default call vibration',
+            initial: state.settings.defaultCallPreset,
+            allowDefault: false,
+            allowMute: true,
+            allowRing: true,
+            onSave: (preset) => state.saveDefaultCallPreset(preset!),
+          ),
+        ),
+        if (_repeatsAnyCall(state.settings)) ...[
+          const SizedBox(height: 12),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            key: const ValueKey('ring-timing'),
+            leading: const Icon(Icons.timer_outlined),
+            title: const Text('Repeat timing'),
+            subtitle: Text(
+              'Every ${state.settings.ringIntervalSeconds} s · '
+              'stops after ${state.settings.ringMaxSeconds} s',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => editRingTiming(context, state, widget.perform),
+          ),
+        ],
+        const SizedBox(height: 12),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
           key: const ValueKey('quiet-hours'),
           leading: const Icon(Icons.bedtime_outlined),
           title: const Text('Quiet hours'),
@@ -136,34 +170,74 @@ class _RulesPanelState extends State<RulesPanel> {
           Builder(
             builder: (context) {
               final pkg = app['packageName']! as String;
+              final label = app['label']! as String;
               final rule = state.settings.apps[pkg];
               final enabled = state.selectedApps.contains(pkg);
               final preset = rule?.preset;
+              final callPreset = rule?.callPreset;
               final icon = app['icon'] as String?;
-              return ListTile(
-                key: ValueKey('app-$pkg'),
-                contentPadding: EdgeInsets.zero,
-                leading: AppIcon(encoded: icon),
-                title: Text(app['label']! as String),
-                subtitle: Text(
-                  '${enabled ? "On" : "Off"} · ${preset?.label ?? "Default: ${state.settings.defaultPreset.label}"}',
-                ),
-                trailing: Switch(
-                  key: ValueKey('app-enabled-$pkg'),
-                  value: enabled,
-                  onChanged: state.changingRelay
-                      ? null
-                      : (value) => widget.perform(
-                          () => state.saveAppRule(pkg, value, preset),
-                        ),
-                ),
-                onTap: () => editVibration(
-                  context,
-                  state,
-                  title: app['label']! as String,
-                  initial: preset,
-                  onSave: (value) => state.saveAppRule(pkg, enabled, value),
-                ),
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    key: ValueKey('app-$pkg'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: AppIcon(encoded: icon),
+                    title: Text(label),
+                    subtitle: Text(
+                      '${enabled ? "On" : "Off"} · Notifications: '
+                      '${preset?.label ?? "Default: ${state.settings.defaultPreset.label}"}',
+                    ),
+                    trailing: Switch(
+                      key: ValueKey('app-enabled-$pkg'),
+                      value: enabled,
+                      onChanged: state.changingRelay
+                          ? null
+                          : (value) => widget.perform(
+                              () => state.saveAppRule(
+                                pkg,
+                                value,
+                                preset,
+                                callPreset,
+                              ),
+                            ),
+                    ),
+                    onTap: () => editVibration(
+                      context,
+                      state,
+                      title: '$label notifications',
+                      initial: preset,
+                      onSave: (value) =>
+                          state.saveAppRule(pkg, enabled, value, callPreset),
+                    ),
+                  ),
+                  // Calls from this app are ranked separately: the same app
+                  // sends both a chat message and a ringing call.
+                  if (enabled)
+                    ListTile(
+                      key: ValueKey('app-calls-$pkg'),
+                      contentPadding: const EdgeInsets.only(left: 56),
+                      dense: true,
+                      leading: const Icon(Icons.call, size: 20),
+                      title: const Text('Calls'),
+                      subtitle: Text(
+                        callPreset?.label ??
+                            'Default: ${state.settings.defaultCallPreset.label}',
+                      ),
+                      onTap: () => editVibration(
+                        context,
+                        state,
+                        title: '$label calls',
+                        initial: callPreset,
+                        allowMute: true,
+                        allowRing: true,
+                        inheritedPreset: state.settings.defaultCallPreset,
+                        inheritLabel: 'Use default call vibration',
+                        onSave: (value) =>
+                            state.saveAppRule(pkg, enabled, preset, value),
+                      ),
+                    ),
+                ],
               );
             },
           ),
@@ -427,6 +501,98 @@ Future<void> editQuietHours(
           ),
         ],
       ),
+    ),
+  );
+}
+
+/// Repeat timing only matters when something is actually set to repeat.
+bool _repeatsAnyCall(RelaySettings settings) =>
+    settings.defaultCallPreset == VibrationPreset.ring ||
+    settings.apps.values.any(
+      (rule) => rule.enabled && rule.callPreset == VibrationPreset.ring,
+    );
+
+Future<void> editRingTiming(
+  BuildContext context,
+  DemoController state,
+  void Function(Future<void> Function()) perform,
+) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  builder: (context) => _RingTimingEditor(state: state, perform: perform),
+);
+
+class _RingTimingEditor extends StatefulWidget {
+  const _RingTimingEditor({required this.state, required this.perform});
+  final DemoController state;
+  final void Function(Future<void> Function()) perform;
+  @override
+  State<_RingTimingEditor> createState() => _RingTimingEditorState();
+}
+
+class _RingTimingEditorState extends State<_RingTimingEditor> {
+  late double interval = widget.state.settings.ringIntervalSeconds.toDouble();
+  late double maximum = widget.state.settings.ringMaxSeconds.toDouble();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(
+      24,
+      24,
+      24,
+      MediaQuery.viewInsetsOf(context).bottom + 24,
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Repeat timing',
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Each pulse opens its own connection to the Air and takes a few '
+          'seconds, and Google Health shares that connection. Below five '
+          'seconds the next pulse starts before the last one is felt.',
+        ),
+        const SizedBox(height: 16),
+        Text('One pulse every ${interval.round()} seconds'),
+        Slider(
+          key: const ValueKey('ring-interval'),
+          min: 5,
+          max: 30,
+          divisions: 25,
+          value: interval,
+          label: '${interval.round()} s',
+          onChanged: (value) => setState(() => interval = value),
+        ),
+        Text('Give up after ${maximum.round()} seconds'),
+        Slider(
+          key: const ValueKey('ring-maximum'),
+          min: 10,
+          max: 180,
+          divisions: 34,
+          value: maximum,
+          label: '${maximum.round()} s',
+          onChanged: (value) => setState(() => maximum = value),
+        ),
+        const SizedBox(height: 16),
+        FilledButton(
+          key: const ValueKey('save-ring-timing'),
+          onPressed: () {
+            widget.perform(
+              () => widget.state.saveRingSettings(
+                interval.round(),
+                maximum.round(),
+              ),
+            );
+            Navigator.pop(context);
+          },
+          child: const Text('Save'),
+        ),
+      ],
     ),
   );
 }
