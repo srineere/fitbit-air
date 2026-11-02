@@ -20,6 +20,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import android.os.ParcelUuid
 import com.fitbit.goldengate.bindings.coap.CoapEndpoint
 import com.fitbit.goldengate.bindings.coap.data.Method
@@ -1235,9 +1236,17 @@ class FitbitAirPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHa
             val target = operation.intensity ?: original
             val body = AirHapticSettings.tap(target)
             var pulses = 0
-            fun pulse(): Single<Int> = postSettings(coap, body)
-                .map { pulses++ }
-                .onErrorReturnItem(pulses)
+            fun pulse(): Single<Int> = Single.defer {
+                val sentAt = SystemClock.elapsedRealtime()
+                postSettings(coap, body).map {
+                    pulses++
+                    Log.i("AirBridge", "pulse ${pulses} rtt=${SystemClock.elapsedRealtime() - sentAt}ms")
+                    pulses
+                }.onErrorResumeNext { error: Throwable ->
+                    Log.w("AirBridge", "pulse dropped after ${SystemClock.elapsedRealtime() - sentAt}ms: ${error.message}")
+                    Single.just(pulses)
+                }
+            }
                 .flatMap { Single.timer(operation.gapMillis, TimeUnit.MILLISECONDS) }
                 .flatMap { if (ringing()) pulse() else Single.just(pulses) }
             pulse().flatMap { count ->

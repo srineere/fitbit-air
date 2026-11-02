@@ -15,6 +15,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.AudioManager
+import android.util.Log
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -66,6 +67,15 @@ class CalendarRelayService : Service() {
 
     private var ring: RingSession? = null
     private var ringSettings = RelayRingSettings()
+
+    /**
+     * The last call that rang. Calls no longer go through the message dedupe,
+     * so without this a phone still ringing after the duration ran out would
+     * start a fresh ring on its next notification update, forever.
+     */
+    private var lastRingKey: String? = null
+    private var lastRingStoppedAt = 0L
+    private var lastRingTimedOut = false
 
     /** Unlocking the phone means the call was reached; the wrist can stop. */
     private val userPresentReceiver = object : BroadcastReceiver() {
@@ -247,14 +257,29 @@ class CalendarRelayService : Service() {
         if (silence != null) { cancelWaiting(silence); record(nextId(), packageName, postedAt, silence, tone = category); return }
         // One ring at a time, and nothing else buzzes during it: a message pulse
         // in the middle of a ring is indistinguishable from the ring itself.
+        Log.i(TAG, "alert pkg=$packageName kind=$kind ongoing=$ongoing preset=${match.preset.id}")
         if (ring != null) { record(nextId(), packageName, postedAt, "ringing", tone = category); return }
-        if (match.preset == RelayPreset.RING) { startRing(key, packageName, match); return }
+        if (match.preset == RelayPreset.RING) {
+            if (rangAlready(key, now)) { record(nextId(), packageName, postedAt, "ring_done"); return }
+            startRing(key, packageName, match)
+            return
+        }
         submit(packageName, postedAt, match)
     }
+
+    /**
+     * This call already had its ring: either it has only just stopped, or it
+     * ran its full duration and the phone is still ringing. Either way the
+     * wrist has said its piece until the call ends.
+     */
+    private fun rangAlready(key: String, now: Long): Boolean =
+        key == lastRingKey && (lastRingTimedOut || now - lastRingStoppedAt < RING_REARM_MILLIS)
 
     /** A ring stops when the call is answered, declined, cleared, or times out. */
     internal fun onAlertRemoved(key: String) {
         if (ring?.key == key) stopRing("cleared")
+        // The call is over, so this key may ring again when it next comes in.
+        if (key == lastRingKey) { lastRingKey = null; lastRingTimedOut = false }
     }
 
     /**
@@ -264,12 +289,15 @@ class CalendarRelayService : Service() {
      * while it rang.
      */
     internal fun onAlertUpdate(key: String, kind: RelayAlertKind) {
-        if (ring?.key == key && kind != RelayAlertKind.CALL) stopRing("answered")
+        if (ring?.key != key) return
+        Log.i(TAG, "ring update kind=$kind")
+        if (kind != RelayAlertKind.CALL) stopRing("answered")
     }
 
     private fun startRing(key: String, packageName: String, match: RelayMatch) {
         val session = RingSession(key, packageName, match, System.currentTimeMillis(), audioMode())
         ring = session
+        Log.i(TAG, "ring start pkg=$packageName gap=${ringSettings.gapMillis}ms max=${ringSettings.maxSeconds}s mode=${session.startMode}")
         record(nextId(), packageName, session.startedAt, "ring_started", match = match)
         refreshNotification()
         sendRing()
@@ -278,6 +306,10 @@ class CalendarRelayService : Service() {
     private fun stopRing(reason: String) {
         val session = ring ?: return
         ring = null
+        lastRingKey = session.key
+        lastRingStoppedAt = System.currentTimeMillis()
+        lastRingTimedOut = reason == "ring_timeout"
+        Log.i(TAG, "ring stop reason=$reason after=${System.currentTimeMillis() - session.startedAt}ms")
         record(nextId(), session.packageName, session.startedAt, "ring_stopped", reason, session.match)
         // Releases the held session; the in-flight ring call then completes on
         // its own and does its own bookkeeping.
@@ -318,6 +350,7 @@ class CalendarRelayService : Service() {
         fun finished(result: RelayWorkerResult) {
             inFlight.remove(id)
             record(id, session.packageName, session.startedAt, result.stage, result.errorCode, session.match)
+            Log.i(TAG, "ring result stage=${result.stage} code=${result.errorCode}")
             saveOutcome("Ring ${result.stage}${result.errorCode?.let { ": $it" } ?: ""}.")
             end()
             // Reaching the duration ends the ring without anyone asking.
@@ -557,6 +590,8 @@ class CalendarRelayService : Service() {
             active?.requestStop("Relay stopped.")
         }
 
+        private const val TAG = "AirBridge"
+        private const val RING_REARM_MILLIS = 15_000L
         private const val CHANNEL = "calendar_relay"
         private const val STOP = "calendar_relay.STOP"
         private const val SILENCE = "calendar_relay.SILENCE"

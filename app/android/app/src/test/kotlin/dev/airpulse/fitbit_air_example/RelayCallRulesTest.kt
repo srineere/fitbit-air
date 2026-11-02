@@ -11,19 +11,26 @@ class RelayCallRulesTest {
         channelId: String?,
     ) = RelayAlertClassifier.classify(category, ongoing, fullScreen, channelId)
 
-    @Test fun `a declared call rings whether or not it is ongoing`() {
-        assertEquals(RelayAlertKind.CALL, classify("call", true, false, "messages"))
-        assertEquals(RelayAlertKind.CALL, classify("call", false, false, null))
-    }
-
-    @Test fun `a full screen or call channel identifies an unlabelled incoming call`() {
-        assertEquals(RelayAlertKind.CALL, classify(null, true, true, "whatsapp_calls"))
-        assertEquals(RelayAlertKind.CALL, classify(null, true, false, "voip_notification"))
+    // Channel and category values below were captured from a real Pixel dialer
+    // and WhatsApp on Android 15.
+    @Test fun `a ringing call is recognised by category, full screen or channel`() {
+        assertEquals(RelayAlertKind.CALL, classify("call", true, true, "phone_incoming_call"))
+        assertEquals(RelayAlertKind.CALL, classify("call", true, true, "voip_notification_7"))
         assertEquals(RelayAlertKind.CALL, classify(null, true, true, null))
+        assertEquals(RelayAlertKind.CALL, classify(null, true, false, "voip_notification"))
+        assertEquals(RelayAlertKind.CALL, classify("call", true, false, "messages"))
     }
 
-    @Test fun `a missed call is an event and must not repeat`() {
-        assertEquals(RelayAlertKind.MESSAGE, classify("missed_call", false, false, "missed_calls"))
+    @Test fun `a call that is no longer ringing never rings the wrist`() {
+        // Answering leaves a sticky notification whose channel still says "call".
+        assertEquals(RelayAlertKind.MESSAGE, classify(null, true, false, "phone_ongoing_call"))
+        assertEquals(RelayAlertKind.MESSAGE, classify("call", true, true, "phone_ongoing_call"))
+        assertEquals(RelayAlertKind.MESSAGE, classify("missed_call", false, false, "phone_missed_call"))
+        assertEquals(RelayAlertKind.MESSAGE, classify(null, false, false, "phone_missed_call"))
+    }
+
+    @Test fun `a call that is not held up is an event, not a ringing phone`() {
+        assertEquals(RelayAlertKind.MESSAGE, classify("call", false, false, null))
     }
 
     @Test fun `an ordinary sticky notification never rings`() {
@@ -72,10 +79,22 @@ class RelayCallRulesTest {
         assertFalse(filter.accept("com.whatsapp", "sticky-key", 10, 20, true, false, null, RelayAlertKind.MESSAGE))
     }
 
-    @Test fun `a ringing app re-posting the same key does not start a second ring`() {
-        val filter = CalendarAlertFilter(0, emptyMap(), setOf("com.whatsapp"))
-        assertTrue(filter.accept("com.whatsapp", "call-key", 10, 20, true, false, null, RelayAlertKind.CALL))
-        assertFalse(filter.accept("com.whatsapp", "call-key", 12, 22, true, false, null, RelayAlertKind.CALL))
+    @Test fun `a dialer reusing one key still rings on every later call`() {
+        // The regression that silenced every call after the first: a dialer
+        // posts each incoming call under the same key, with no timestamp to
+        // tell the calls apart.
+        val filter = CalendarAlertFilter(0, emptyMap(), setOf("com.google.android.dialer"))
+        repeat(4) { attempt ->
+            val postedAt = 10L + attempt * 1_000
+            assertTrue(
+                "call ${attempt + 1} was swallowed",
+                filter.accept("com.google.android.dialer", "call-key", postedAt, postedAt + 10,
+                    true, false, null, RelayAlertKind.CALL),
+            )
+        }
+        // Messages keep their dedupe: the same chat key cannot buzz twice.
+        assertTrue(filter.accept("com.google.android.dialer", "chat", 10, 20, false, false, null))
+        assertFalse(filter.accept("com.google.android.dialer", "chat", 12, 22, false, false, null))
     }
 
     @Test fun `ring timing is bounded so pulses stay distinguishable`() {

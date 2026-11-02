@@ -16,8 +16,17 @@ internal enum class RelayAlertKind { CALL, MESSAGE }
  * as a call, ask for the full screen, or post it on a call channel.
  */
 internal object RelayAlertClassifier {
-    /** Channel IDs messaging apps use for incoming calls. */
-    private val callChannel = Regex("call|voip|ring", RegexOption.IGNORE_CASE)
+    /** Channel IDs apps use while a call is still ringing. */
+    private val ringingChannel = Regex("incoming|voip|ring", RegexOption.IGNORE_CASE)
+
+    /**
+     * Channel IDs for calls that are no longer ringing. Matching "call" alone
+     * is not enough: a dialer's answered call sits on `phone_ongoing_call` and
+     * a missed one on `phone_missed_call`, and buzzing the wrist through a
+     * conversation you are already having is worse than missing the call.
+     */
+    private val settledChannel =
+        Regex("ongoing|active|missed|voicemail|history", RegexOption.IGNORE_CASE)
 
     fun classify(notification: Notification, ongoing: Boolean): RelayAlertKind = classify(
         category = notification.category,
@@ -32,10 +41,12 @@ internal object RelayAlertClassifier {
         fullScreen: Boolean,
         channelId: String?,
     ): RelayAlertKind {
-        // A missed call is an event, not a ringing phone: it must not repeat.
-        if (category == Notification.CATEGORY_CALL) return RelayAlertKind.CALL
+        // A phone that is still ringing holds its notification up; a missed
+        // call is an event, and an answered one is already in your hand.
+        if (channelId != null && settledChannel.containsMatchIn(channelId)) return RelayAlertKind.MESSAGE
         if (!ongoing) return RelayAlertKind.MESSAGE
-        val ringing = fullScreen || (channelId != null && callChannel.containsMatchIn(channelId))
+        val ringing = category == Notification.CATEGORY_CALL || fullScreen ||
+            (channelId != null && ringingChannel.containsMatchIn(channelId))
         return if (ringing) RelayAlertKind.CALL else RelayAlertKind.MESSAGE
     }
 }

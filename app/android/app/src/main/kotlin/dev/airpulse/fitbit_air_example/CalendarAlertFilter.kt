@@ -12,11 +12,15 @@ internal class CalendarAlertFilter(
                ongoing: Boolean, summary: Boolean, messageTimestamp: Long? = null,
                kind: RelayAlertKind = RelayAlertKind.MESSAGE): Boolean {
         // A ringing call is ongoing by design; every other sticky notification
-        // is still ignored. A ringing app re-posts the same key while it rings,
-        // which `seen` collapses: the ring session, not the filter, repeats it.
+        // is still ignored.
         val stickyBlocks = ongoing && kind != RelayAlertKind.CALL
         if (packageName !in selectedPackages || stickyBlocks || summary ||
             postedAt < startedAt || postedAt > now || now - postedAt >= 30_000) return false
+        // Calls skip the message dedupe entirely. A dialer reuses one key for
+        // every call and a call carries no message timestamp, so `seen` lets
+        // the first call through and silences every later one. Re-posts while
+        // a call rings are absorbed by the ring that is already running.
+        if (kind == RelayAlertKind.CALL) return true
         if (seen.containsKey(key)) {
             // Messaging apps reuse chat IDs. Only a strictly newer message can buzz again.
             val previous = seen[key]

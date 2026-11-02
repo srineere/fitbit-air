@@ -1,6 +1,7 @@
 package dev.airpulse.fitbit_air_example
 
 import android.os.Build
+import android.util.Log
 import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -31,6 +32,10 @@ class CalendarNotificationListener : NotificationListenerService() {
             .onFailure { RelayConversations.captureError() }
         val relay = CalendarRelayService.active ?: return
         if (!relay.acceptsPackage(sbn.packageName)) return
+        // Metadata only: no sender, no message text.
+        Log.i("AirBridge", "posted pkg=${sbn.packageName} ongoing=${sbn.isOngoing} " +
+            "category=${sbn.notification.category} fullScreen=${sbn.notification.fullScreenIntent != null} " +
+            "channel=${if (Build.VERSION.SDK_INT >= 26) sbn.notification.channelId else null}")
         // Opt-in: the text stays local to this call; only the tone reaches the relay.
         val tone = if (!relay.toneEnabled) null else runCatching {
             val ranking = NotificationListenerService.Ranking()
