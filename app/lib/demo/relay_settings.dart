@@ -3,12 +3,16 @@ import 'package:fitbit_air/fitbit_air.dart';
 enum VibrationPreset {
   single('single', 'One pulse', 'Uses your current strength'),
   low('low', 'One pulse · Low', 'The band keeps low strength afterward'),
-  high('high', 'One pulse · High', 'The band keeps high strength afterward'),
+  high(
+    'high',
+    'One pulse · Strongest',
+    'The Air has two strengths; this is the stronger one',
+  ),
   doublePulse('double', 'Two pulses', 'Restores your original strength'),
   ring(
     'ring',
-    'Repeat until answered',
-    'One pulse every few seconds while the call rings',
+    'Ring until answered',
+    'Repeating strong pulses while the call rings',
     callsOnly: true,
   ),
   mute('mute', 'Silent', 'No vibration for this chat');
@@ -78,7 +82,7 @@ class RelaySettings {
   const RelaySettings({
     this.defaultPreset = VibrationPreset.single,
     this.defaultCallPreset = VibrationPreset.ring,
-    this.ringIntervalSeconds = 6,
+    this.ringGapMillis = 700,
     this.ringMaxSeconds = 45,
     this.apps = const {},
     this.chats = const [],
@@ -98,8 +102,8 @@ class RelaySettings {
   /// Used for calls from apps without their own call vibration.
   final VibrationPreset defaultCallPreset;
 
-  /// Seconds between pulses while a call rings, and when the ring gives up.
-  final int ringIntervalSeconds;
+  /// Milliseconds between pulses while a call rings, and when it gives up.
+  final int ringGapMillis;
   final int ringMaxSeconds;
   final Map<String, AppNotificationRule> apps;
   final List<SavedChat> chats;
@@ -127,7 +131,7 @@ class RelaySettings {
       defaultCallPreset: map['defaultCallPreset'] == null
           ? VibrationPreset.ring
           : VibrationPreset.parse(map['defaultCallPreset']),
-      ringIntervalSeconds: map['ringIntervalSeconds'] as int? ?? 6,
+      ringGapMillis: map['ringGapMillis'] as int? ?? 700,
       ringMaxSeconds: map['ringMaxSeconds'] as int? ?? 45,
       apps: appMap.map((key, value) {
         final rule = value as Map;

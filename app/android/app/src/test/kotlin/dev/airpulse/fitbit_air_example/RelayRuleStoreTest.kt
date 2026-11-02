@@ -11,7 +11,7 @@ class RelayRuleStoreTest {
                 "com.calendar" to RelayAppRule(false)),
             mapOf("private-chat-hash" to SavedChat("com.whatsapp", "Chat", "name", RelayPreset.MUTE),
                 "other-hash" to SavedChat("com.whatsapp.w4b", "Shop")),
-            RelaySilence(-1, true, 540, 1020), ring = RelayRingSettings(9, 120), everyoneElseSilent = true)
+            RelaySilence(-1, true, 540, 1020), ring = RelayRingSettings(450, 120), everyoneElseSilent = true)
         val actual = RelayRuleStore.decode(JSONObject(RelayRuleStore.encode(expected).toString()))
         assertEquals(expected, actual)
         assertNull(actual.apps["com.calendar"]!!.preset)

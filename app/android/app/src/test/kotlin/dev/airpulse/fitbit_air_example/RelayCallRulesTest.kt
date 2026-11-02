@@ -78,13 +78,21 @@ class RelayCallRulesTest {
         assertFalse(filter.accept("com.whatsapp", "call-key", 12, 22, true, false, null, RelayAlertKind.CALL))
     }
 
-    @Test fun `ring timing is bounded so pulses cannot overlap`() {
-        assertEquals(6_000L, RelayRingSettings().intervalMillis)
+    @Test fun `ring timing is bounded so pulses stay distinguishable`() {
+        assertEquals(700, RelayRingSettings().gapMillis)
         assertEquals(45_000L, RelayRingSettings().maxMillis)
-        val tooFast = RelayRingSettings.MINIMUM_INTERVAL_SECONDS - 1
+        val tooFast = RelayRingSettings.MINIMUM_GAP_MILLIS - 1
         assertThrows(IllegalArgumentException::class.java) { RelayRingSettings(tooFast, 45) }
-        assertThrows(IllegalArgumentException::class.java) { RelayRingSettings(6, 5) }
-        assertThrows(IllegalArgumentException::class.java) { RelayRingSettings(6, 301) }
+        assertThrows(IllegalArgumentException::class.java) { RelayRingSettings(5_001, 45) }
+        // Bounded below the relay's 240 s watchdog.
+        assertThrows(IllegalArgumentException::class.java) { RelayRingSettings(700, 181) }
+        assertThrows(IllegalArgumentException::class.java) { RelayRingSettings(700, 9) }
+    }
+
+    @Test fun `a ring always pulses at the stronger of the two strengths`() {
+        assertEquals(3, RelayPreset.RING.intensity)
+        assertEquals(3, RelayPreset.HIGH.intensity)
+        assertEquals(RelayPreset.HIGH, RelayRuleConfig().defaultPreset)
     }
 
     @Test fun `only calls may repeat`() {

@@ -30,13 +30,14 @@ class RelayRulePolicyTest {
         assertNull(silent.match(whatsapp, setOf("carol")))
         assertNull(silent.copy(chats = emptyMap()).match(whatsapp, setOf("alice")))
         assertEquals(RelayMatch(RelayPreset.HIGH, 1), silent.match(whatsapp, setOf("alice")))
-        // A saved chat without its own vibration uses the app vibration.
-        assertEquals(RelayMatch(RelayPreset.CURRENT, 0), silent.match(whatsapp, setOf("bob")))
-        assertEquals(RelayMatch(RelayPreset.CURRENT, 0), config.match(whatsapp, setOf("carol")))
+        // A saved chat without its own vibration uses the app vibration, which
+        // falls through to the shipped default of the stronger strength.
+        assertEquals(RelayMatch(RelayPreset.HIGH, 0), silent.match(whatsapp, setOf("bob")))
+        assertEquals(RelayMatch(RelayPreset.HIGH, 0), config.match(whatsapp, setOf("carol")))
         assertNull(config.copy(apps = mapOf(whatsapp to RelayAppRule(false))).match(whatsapp, setOf("alice")))
     }
     @Test fun `message tone only applies when enabled and keeps mutes`() {
-        assertEquals(RelayMatch(RelayPreset.CURRENT, 0), config.match(whatsapp, emptySet(), RelayTone.URGENT))
+        assertEquals(RelayMatch(RelayPreset.HIGH, 0), config.match(whatsapp, emptySet(), RelayTone.URGENT))
         val toned = config.copy(tone = RelayToneRules(true, urgent = RelayPreset.DOUBLE, neutral = RelayPreset.MUTE))
         assertEquals(RelayMatch(RelayPreset.DOUBLE, 2, RelayTone.URGENT), toned.match(whatsapp, setOf("alice"), RelayTone.URGENT))
         // The category is kept for history even when it keeps the chat's vibration.

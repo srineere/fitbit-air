@@ -43,28 +43,28 @@ internal object RelayAlertClassifier {
 /**
  * How a call repeats on the Air.
  *
- * One pulse costs a secure session: about 2.5 s over a warm link, and Google
- * Health shares that channel. An interval below [MINIMUM_INTERVAL_SECONDS]
- * would start the next session before the previous pulse is felt, so the
- * wearer gains nothing and Google Health only falls further behind.
+ * The ring holds one secure session and posts a pulse every [gapMillis], so
+ * the gap is a real pulse rhythm rather than the cost of a fresh connection.
+ * The Air plays one pulse per change it notices, so a gap shorter than a pulse
+ * merges buzzes into fewer, longer ones.
  */
 internal data class RelayRingSettings(
-    val intervalSeconds: Int = DEFAULT_INTERVAL_SECONDS,
+    val gapMillis: Int = DEFAULT_GAP_MILLIS,
     val maxSeconds: Int = DEFAULT_MAX_SECONDS,
 ) {
     init {
-        require(intervalSeconds in MINIMUM_INTERVAL_SECONDS..60) {
-            "Repeat a call every $MINIMUM_INTERVAL_SECONDS–60 seconds."
+        require(gapMillis in MINIMUM_GAP_MILLIS..5_000) {
+            "Pulses must be $MINIMUM_GAP_MILLIS-5000 ms apart."
         }
-        require(maxSeconds in 10..300) { "Ring for 10–300 seconds." }
+        // Bounded below the relay's own 240 s command watchdog.
+        require(maxSeconds in 10..180) { "Ring for 10-180 seconds." }
     }
 
-    val intervalMillis: Long get() = intervalSeconds * 1_000L
     val maxMillis: Long get() = maxSeconds * 1_000L
 
     companion object {
-        const val MINIMUM_INTERVAL_SECONDS = 5
-        const val DEFAULT_INTERVAL_SECONDS = 6
+        const val MINIMUM_GAP_MILLIS = 250
+        const val DEFAULT_GAP_MILLIS = 700
         const val DEFAULT_MAX_SECONDS = 45
     }
 }

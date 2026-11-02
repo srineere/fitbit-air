@@ -4,7 +4,7 @@ import java.util.Calendar
 import java.util.TimeZone
 
 internal enum class RelayPreset(val id: String, val intensity: Int? = null) {
-    CURRENT("single"), LOW("low", 2), HIGH("high", 3), DOUBLE("double"), RING("ring"), MUTE("mute");
+    CURRENT("single"), LOW("low", 2), HIGH("high", 3), DOUBLE("double"), RING("ring", 3), MUTE("mute");
 
     /** A repeating pulse only makes sense while something is still ringing. */
     val callsOnly: Boolean get() = this == RING
@@ -67,7 +67,9 @@ internal data class RelaySilence(
 }
 
 internal data class RelayRuleConfig(
-    val defaultPreset: RelayPreset = RelayPreset.CURRENT,
+    // The Air has two strengths; a notification you want to feel uses the
+    // stronger one, and a call never uses anything else.
+    val defaultPreset: RelayPreset = RelayPreset.HIGH,
     val defaultCallPreset: RelayPreset = RelayPreset.RING,
     val apps: Map<String, RelayAppRule> = emptyMap(),
     val chats: Map<String, SavedChat> = emptyMap(),

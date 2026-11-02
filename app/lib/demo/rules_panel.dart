@@ -110,7 +110,7 @@ class _RulesPanelState extends State<RulesPanel> {
             leading: const Icon(Icons.timer_outlined),
             title: const Text('Repeat timing'),
             subtitle: Text(
-              'Every ${state.settings.ringIntervalSeconds} s · '
+              'A pulse every ${state.settings.ringGapMillis} ms · '
               'stops after ${state.settings.ringMaxSeconds} s',
             ),
             trailing: const Icon(Icons.chevron_right),
@@ -532,7 +532,7 @@ class _RingTimingEditor extends StatefulWidget {
 }
 
 class _RingTimingEditorState extends State<_RingTimingEditor> {
-  late double interval = widget.state.settings.ringIntervalSeconds.toDouble();
+  late double gap = widget.state.settings.ringGapMillis.toDouble();
   late double maximum = widget.state.settings.ringMaxSeconds.toDouble();
 
   @override
@@ -553,20 +553,21 @@ class _RingTimingEditorState extends State<_RingTimingEditor> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Each pulse opens its own connection to the Air and takes a few '
-          'seconds, and Google Health shares that connection. Below five '
-          'seconds the next pulse starts before the last one is felt.',
+          'A ring holds one connection open and pulses inside it. The Air '
+          'plays one pulse per change it notices, so too short a gap merges '
+          'buzzes into fewer, longer ones. While it rings, Google Health '
+          'cannot sync.',
         ),
         const SizedBox(height: 16),
-        Text('One pulse every ${interval.round()} seconds'),
+        Text('A pulse every ${gap.round()} ms'),
         Slider(
-          key: const ValueKey('ring-interval'),
-          min: 5,
-          max: 30,
-          divisions: 25,
-          value: interval,
-          label: '${interval.round()} s',
-          onChanged: (value) => setState(() => interval = value),
+          key: const ValueKey('ring-gap'),
+          min: 250,
+          max: 2000,
+          divisions: 35,
+          value: gap,
+          label: '${gap.round()} ms',
+          onChanged: (value) => setState(() => gap = value),
         ),
         Text('Give up after ${maximum.round()} seconds'),
         Slider(
@@ -584,7 +585,7 @@ class _RingTimingEditorState extends State<_RingTimingEditor> {
           onPressed: () {
             widget.perform(
               () => widget.state.saveRingSettings(
-                interval.round(),
+                gap.round(),
                 maximum.round(),
               ),
             );

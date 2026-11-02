@@ -115,9 +115,9 @@ class MainActivity : FlutterActivity() {
                             result.success(null)
                         }
                         "saveRingSettings" -> {
-                            val interval = requireNotNull(call.argument<Int>("intervalSeconds"))
+                            val gap = requireNotNull(call.argument<Int>("gapMillis"))
                             val max = requireNotNull(call.argument<Int>("maxSeconds"))
-                            RelayRuleStore.update(this) { it.copy(ring = RelayRingSettings(interval, max)) }
+                            RelayRuleStore.update(this) { it.copy(ring = RelayRingSettings(gap, max)) }
                             result.success(null)
                         }
                         "saveChat" -> {

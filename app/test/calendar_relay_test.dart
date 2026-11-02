@@ -972,7 +972,7 @@ void main() {
     ];
     await mount(tester);
     await tap(tester, 'conversation-picker');
-    expect(find.textContaining('One pulse · High'), findsOneWidget);
+    expect(find.textContaining('One pulse · Strongest'), findsOneWidget);
     await tap(tester, 'remove-chat-private-chat');
     await tap(tester, 'confirm-remove-chat');
     expect(controller.settings.chats, isEmpty);

@@ -66,7 +66,6 @@ class CalendarRelayService : Service() {
 
     private var ring: RingSession? = null
     private var ringSettings = RelayRingSettings()
-    private val ringTick = Runnable { sendRing() }
 
     /** Unlocking the phone means the call was reached; the wrist can stop. */
     private val userPresentReceiver = object : BroadcastReceiver() {
@@ -279,8 +278,10 @@ class CalendarRelayService : Service() {
     private fun stopRing(reason: String) {
         val session = ring ?: return
         ring = null
-        handler.removeCallbacks(ringTick)
         record(nextId(), session.packageName, session.startedAt, "ring_stopped", reason, session.match)
+        // Releases the held session; the in-flight ring call then completes on
+        // its own and does its own bookkeeping.
+        runCatching { channel?.invokeMethod("stopRing", null) }
         // Give Google Health the usual quiet window now that the ring is over.
         coalescer.onFinished(System.currentTimeMillis())
         refreshNotification()
@@ -297,13 +298,18 @@ class CalendarRelayService : Service() {
     private fun answered(session: RingSession): Boolean =
         inCallMode(audioMode()) && !inCallMode(session.startMode)
 
+    /**
+     * Starts one held ring. The worker keeps the secure session open and
+     * pulses inside it, so this is a single long call rather than a pulse
+     * schedule: stopping means telling the worker, not cancelling a timer.
+     */
     private fun sendRing() {
         val session = ring ?: return
         if (stopping || !ready) { stopRing("cancelled"); return }
-        val now = System.currentTimeMillis()
-        if (now - session.startedAt >= ringSettings.maxMillis) { stopRing("ring_timeout"); return }
         if (answered(session)) { stopRing("answered"); return }
-        RelayRuleStore.read(this).silence.reason(now)?.let { stopRing(it); return }
+        RelayRuleStore.read(this).silence.reason(System.currentTimeMillis())?.let { stopRing(it); return }
+        val worker = channel
+        if (worker == null) { stopRing("worker_unavailable"); return }
         val id = nextId()
         begin()
         refreshDeadline()
@@ -314,20 +320,13 @@ class CalendarRelayService : Service() {
             record(id, session.packageName, session.startedAt, result.stage, result.errorCode, session.match)
             saveOutcome("Ring ${result.stage}${result.errorCode?.let { ": $it" } ?: ""}.")
             end()
-            // The next pulse is scheduled from the end of this one, so sessions
-            // never overlap however long the handshake took.
-            if (ring === session && !stopping) handler.postDelayed(ringTick, ringSettings.intervalMillis)
+            // Reaching the duration ends the ring without anyone asking.
+            if (ring === session) stopRing("ring_finished")
         }
-        // A pulse that could not be delivered within one interval is stale: the
-        // next tick replaces it rather than queueing a buzz after the call ends.
-        val worker = channel
-        if (worker == null) {
-            finished(RelayWorkerResult("failed", "WORKER_UNAVAILABLE"))
-            return
-        }
-        worker.invokeMethod("dispatch", mapOf(
-            "id" to id, "expiresAt" to now + ringSettings.intervalMillis,
-            "kind" to "tap", "intensity" to session.match.preset.intensity
+        worker.invokeMethod("ring", mapOf(
+            "gapMillis" to ringSettings.gapMillis,
+            "maxMillis" to ringSettings.maxMillis.toInt(),
+            "intensity" to session.match.preset.intensity,
         ), object : MethodChannel.Result {
             override fun success(result: Any?) { finished(RelayWorkerResult.decode(result)) }
             override fun error(code: String, message: String?, details: Any?) { finished(RelayWorkerResult("failed", "WORKER_ERROR")) }
@@ -508,7 +507,6 @@ class CalendarRelayService : Service() {
         previewReplies.clear()
         replies.forEach { it(RelayWorkerResult("failed", "SERVICE_STOPPED")) }
         ring = null
-        handler.removeCallbacks(ringTick)
         unregisterReceiver(clockReceiver)
         unregisterReceiver(userPresentReceiver)
         handler.removeCallbacks(silenceTick)

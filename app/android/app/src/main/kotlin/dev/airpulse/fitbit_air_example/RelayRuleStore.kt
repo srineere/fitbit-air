@@ -63,8 +63,11 @@ internal object RelayRuleStore {
             },
             silence = RelaySilence(quiet.getLong("pauseUntil"), quiet.getBoolean("quietEnabled"), quiet.getInt("startMinute"), quiet.getInt("endMinute")),
             tone = RelayToneRules(tone?.getBoolean("enabled") ?: false, tonePreset("urgent"), tonePreset("negative"), tonePreset("neutral")),
+            // Configs written before the ring held its session stored a
+            // per-pulse reconnect interval, which no longer means anything.
             ring = if (ring == null) RelayRingSettings() else RelayRingSettings(
-                ring.getInt("intervalSeconds"), ring.getInt("maxSeconds"),
+                ring.optInt("gapMillis", RelayRingSettings.DEFAULT_GAP_MILLIS),
+                ring.getInt("maxSeconds").coerceIn(10, 180),
             ),
             everyoneElseSilent = if (version == 1) legacy!!.second else json.getBoolean("everyoneElseSilent"),
         )
@@ -88,7 +91,7 @@ internal object RelayRuleStore {
             .put("apps", apps).put("chats", chats).put("everyoneElseSilent", config.everyoneElseSilent)
             .put("silence", JSONObject().put("pauseUntil", s.pauseUntil).put("quietEnabled", s.quietEnabled)
                 .put("startMinute", s.startMinute).put("endMinute", s.endMinute))
-            .put("ring", JSONObject().put("intervalSeconds", config.ring.intervalSeconds)
+            .put("ring", JSONObject().put("gapMillis", config.ring.gapMillis)
                 .put("maxSeconds", config.ring.maxSeconds))
         val t = config.tone
         json.put("tone", JSONObject().put("enabled", t.enabled).put("urgent", t.urgent?.id ?: JSONObject.NULL)
@@ -118,7 +121,7 @@ internal object RelayRuleStore {
         val c = read(context)
         return mapOf("defaultPreset" to c.defaultPreset.id,
             "defaultCallPreset" to c.defaultCallPreset.id,
-            "ringIntervalSeconds" to c.ring.intervalSeconds, "ringMaxSeconds" to c.ring.maxSeconds,
+            "ringGapMillis" to c.ring.gapMillis, "ringMaxSeconds" to c.ring.maxSeconds,
             "apps" to c.apps.mapValues { (_, r) ->
                 mapOf("enabled" to r.enabled, "preset" to r.preset?.id, "callPreset" to r.callPreset?.id)
             },

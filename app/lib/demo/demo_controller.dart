@@ -738,10 +738,10 @@ class DemoController extends ChangeNotifier {
   Future<void> saveDefaultCallPreset(VibrationPreset preset) =>
       _relayCall('saveDefaultCallPreset', {'preset': preset.id});
 
-  /// How often a ringing call pulses, and when it gives up.
-  Future<void> saveRingSettings(int intervalSeconds, int maxSeconds) =>
+  /// How fast a ringing call pulses, and when it gives up.
+  Future<void> saveRingSettings(int gapMillis, int maxSeconds) =>
       _relayCall('saveRingSettings', {
-        'intervalSeconds': intervalSeconds,
+        'gapMillis': gapMillis,
         'maxSeconds': maxSeconds,
       });
 

@@ -79,8 +79,36 @@ Future<void> airCalendarRelay() async {
   channel.setMethodCallHandler((call) async {
     if (call.method == 'close') {
       dispatcher.close();
+      unawaited(FitbitAir.stopRing().catchError((Object _) {}));
       unawaited(FitbitAir.keepLinkWarm(false).catchError((Object _) {}));
       return null;
+    }
+    // Deliberately outside the operation queue: the queue is busy holding the
+    // ring, and this is what releases it.
+    if (call.method == 'stopRing') {
+      await FitbitAir.stopRing();
+      return null;
+    }
+    if (call.method == 'ring') {
+      final args = Map<String, Object?>.from(call.arguments as Map);
+      try {
+        final result = await operations.run(
+          () => FitbitAir.ring(
+            intensity: args['intensity'] == null
+                ? null
+                : HapticIntensity.fromWireValue(args['intensity']! as int),
+            gap: Duration(milliseconds: args['gapMillis']! as int),
+            maximum: Duration(milliseconds: args['maxMillis']! as int),
+          ),
+        );
+        return {
+          'status': 'completed',
+          'pulses': result.pulses,
+          'restored': result.restored,
+        };
+      } on FitbitAirException catch (error) {
+        return {'status': 'failed', 'errorCode': error.code};
+      }
     }
     if (const {
       'readBattery',
