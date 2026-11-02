@@ -106,8 +106,13 @@ internal object RelayRingWatch {
      * while they ring: only a change into an in-call mode is an answer.
      */
     fun reason(startMode: Int, sawRingtone: Boolean, mode: Int): String? = when {
+        // The phone was ringing and has stopped: answered, declined, missed or
+        // cancelled, it makes no difference to the wrist. Whichever state it
+        // moved to, it is no longer a ringing phone.
+        sawRingtone && mode != MODE_RINGTONE -> if (inCall(mode)) "answered" else "ended"
+        // An app that rings while already holding the audio session never sets
+        // MODE_RINGTONE, so for those only a move into a call counts.
         inCall(mode) && !inCall(startMode) -> "answered"
-        sawRingtone && mode == MODE_NORMAL -> "ended"
         else -> null
     }
 }

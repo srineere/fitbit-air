@@ -44,8 +44,10 @@ class CalendarNotificationListener : NotificationListenerService() {
                 RelayNotificationSignals.from(sbn.notification, ranking, System.currentTimeMillis()),
                 RelayToneLexicons.shared(this))
         }.getOrNull()
+        // A notification update is never taken as the call ending: a dialer
+        // repaints the same key as an ongoing call while it is still ringing.
+        // Only the ringer decides that, in CalendarRelayService's ring watch.
         val kind = RelayAlertClassifier.classify(sbn.notification, sbn.isOngoing)
-        relay.onAlertUpdate(sbn.key, kind)
         relay.onAlert(
             sbn.packageName, sbn.key, sbn.postTime, sbn.isOngoing,
             sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0,

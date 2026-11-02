@@ -140,6 +140,8 @@ class RelayCallRulesTest {
         assertEquals("answered", RelayRingWatch.reason(ringing, true, RelayRingWatch.MODE_IN_COMMUNICATION))
         // Declined, missed, or cancelled by the caller.
         assertEquals("ended", RelayRingWatch.reason(ringing, true, RelayRingWatch.MODE_NORMAL))
+        // Any other state is still "no longer ringing", and must not hang.
+        assertEquals("ended", RelayRingWatch.reason(ringing, true, 4))
     }
 
     @Test fun `an app already holding the audio session is not treated as answered`() {

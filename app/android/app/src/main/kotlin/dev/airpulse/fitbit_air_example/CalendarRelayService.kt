@@ -325,18 +325,6 @@ class CalendarRelayService : Service() {
         if (key == lastRingKey) { lastRingKey = null; lastRingTimedOut = false }
     }
 
-    /**
-     * Answering usually rewrites the ringing notification in place rather than
-     * removing it: same key, but no longer a ringing call. That update is the
-     * fastest answer signal there is for an app that held the audio session
-     * while it rang.
-     */
-    internal fun onAlertUpdate(key: String, kind: RelayAlertKind) {
-        if (ring?.key != key) return
-        Log.i(TAG, "ring update kind=$kind")
-        if (kind != RelayAlertKind.CALL) stopRing("answered")
-    }
-
     private fun startRing(key: String, packageName: String, match: RelayMatch) {
         val session = RingSession(key, packageName, match, System.currentTimeMillis(), audioMode())
         ring = session
