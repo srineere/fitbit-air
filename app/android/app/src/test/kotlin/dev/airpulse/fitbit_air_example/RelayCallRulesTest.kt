@@ -123,6 +123,32 @@ class RelayCallRulesTest {
         assertEquals(RelayPreset.HIGH, RelayRuleConfig().defaultPreset)
     }
 
+    @Test fun `a replaced ringing notification does not end the ring`() {
+        // A locked phone swaps the ringing notification for its full-screen
+        // call UI; the dialer ring used to die ~680 ms in because of it.
+        assertFalse(RelayRingWatch.stopOnRemoval(RelayRingWatch.MODE_RINGTONE))
+        assertTrue(RelayRingWatch.stopOnRemoval(RelayRingWatch.MODE_NORMAL))
+        assertTrue(RelayRingWatch.stopOnRemoval(RelayRingWatch.MODE_IN_CALL))
+    }
+
+    @Test fun `the ring ends when the phone stops ringing, however it ended`() {
+        val ringing = RelayRingWatch.MODE_RINGTONE
+        // Still ringing.
+        assertNull(RelayRingWatch.reason(ringing, true, ringing))
+        // Picked up, on the phone and in a VoIP app.
+        assertEquals("answered", RelayRingWatch.reason(ringing, true, RelayRingWatch.MODE_IN_CALL))
+        assertEquals("answered", RelayRingWatch.reason(ringing, true, RelayRingWatch.MODE_IN_COMMUNICATION))
+        // Declined, missed, or cancelled by the caller.
+        assertEquals("ended", RelayRingWatch.reason(ringing, true, RelayRingWatch.MODE_NORMAL))
+    }
+
+    @Test fun `an app already holding the audio session is not treated as answered`() {
+        val inComm = RelayRingWatch.MODE_IN_COMMUNICATION
+        assertNull(RelayRingWatch.reason(inComm, false, inComm))
+        // It has never been heard ringing, so silence cannot mean it ended.
+        assertNull(RelayRingWatch.reason(inComm, false, RelayRingWatch.MODE_NORMAL))
+    }
+
     @Test fun `only calls may repeat`() {
         assertTrue(RelayPreset.RING.callsOnly)
         assertFalse(RelayPreset.DOUBLE.callsOnly)

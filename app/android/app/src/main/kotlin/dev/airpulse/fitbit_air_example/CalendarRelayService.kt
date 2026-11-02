@@ -63,7 +63,10 @@ class CalendarRelayService : Service() {
          * in-call mode means the call was picked up.
          */
         val startMode: Int,
-    )
+    ) {
+        /** The phone was heard ringing, so a return to silence means it ended. */
+        var sawRingtone: Boolean = startMode == RelayRingWatch.MODE_RINGTONE
+    }
 
     private var ring: RingSession? = null
     private var ringSettings = RelayRingSettings()
@@ -296,9 +299,28 @@ class CalendarRelayService : Service() {
     private fun rangAlready(key: String, now: Long): Boolean =
         key == lastRingKey && (lastRingTimedOut || now - lastRingStoppedAt < RING_REARM_MILLIS)
 
+    /**
+     * Polls the audio mode, because once the ringing notification has been
+     * replaced there is nothing left to tell us how the call ended.
+     */
+    private val ringWatch = object : Runnable {
+        override fun run() {
+            val session = ring ?: return
+            val mode = audioMode()
+            if (mode == RelayRingWatch.MODE_RINGTONE) session.sawRingtone = true
+            val reason = RelayRingWatch.reason(session.startMode, session.sawRingtone, mode)
+            if (reason != null) stopRing(reason) else handler.postDelayed(this, RING_WATCH_MILLIS)
+        }
+    }
+
     /** A ring stops when the call is answered, declined, cleared, or times out. */
     internal fun onAlertRemoved(key: String) {
-        if (ring?.key == key) stopRing("cleared")
+        if (ring?.key == key) {
+            // A locked phone swaps the ringing notification for its full-screen
+            // call UI. That is not the call ending, and the ringer says so.
+            if (RelayRingWatch.stopOnRemoval(audioMode())) stopRing("cleared")
+            else Log.i(TAG, "ringing notification replaced; phone still ringing")
+        }
         // The call is over, so this key may ring again when it next comes in.
         if (key == lastRingKey) { lastRingKey = null; lastRingTimedOut = false }
     }
@@ -321,12 +343,14 @@ class CalendarRelayService : Service() {
         Log.i(TAG, "ring start pkg=$packageName gap=${ringSettings.gapMillis}ms max=${ringSettings.maxSeconds}s mode=${session.startMode}")
         record(nextId(), packageName, session.startedAt, "ring_started", match = match)
         refreshNotification()
+        handler.postDelayed(ringWatch, RING_WATCH_MILLIS)
         sendRing()
     }
 
     private fun stopRing(reason: String) {
         val session = ring ?: return
         ring = null
+        handler.removeCallbacks(ringWatch)
         lastRingKey = session.key
         lastRingStoppedAt = System.currentTimeMillis()
         lastRingTimedOut = reason == "ring_timeout"
@@ -344,12 +368,9 @@ class CalendarRelayService : Service() {
         getSystemService(AudioManager::class.java).mode
     }.getOrDefault(AudioManager.MODE_NORMAL)
 
-    private fun inCallMode(mode: Int) =
-        mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION
-
     /** True once this call was picked up, including WhatsApp and Instagram calls. */
     private fun answered(session: RingSession): Boolean =
-        inCallMode(audioMode()) && !inCallMode(session.startMode)
+        RelayRingWatch.reason(session.startMode, session.sawRingtone, audioMode()) != null
 
     /**
      * Starts one held ring. The worker keeps the secure session open and
@@ -561,6 +582,7 @@ class CalendarRelayService : Service() {
         previewReplies.clear()
         replies.forEach { it(RelayWorkerResult("failed", "SERVICE_STOPPED")) }
         ring = null
+        handler.removeCallbacks(ringWatch)
         unregisterReceiver(clockReceiver)
         unregisterReceiver(userPresentReceiver)
         handler.removeCallbacks(silenceTick)
@@ -613,6 +635,7 @@ class CalendarRelayService : Service() {
 
         private const val TAG = "AirBridge"
         private const val RING_REARM_MILLIS = 15_000L
+        private const val RING_WATCH_MILLIS = 1_000L
         private const val CHANNEL = "calendar_relay"
         private const val STOP = "calendar_relay.STOP"
         private const val SILENCE = "calendar_relay.SILENCE"

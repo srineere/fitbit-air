@@ -79,3 +79,35 @@ internal data class RelayRingSettings(
         const val DEFAULT_MAX_SECONDS = 45
     }
 }
+
+/**
+ * Whether a call is still ringing, decided from the audio mode rather than
+ * from notifications.
+ *
+ * A notification is a poor witness: a locked phone replaces the ringing
+ * notification with its full-screen call UI, which looks exactly like the call
+ * going away. `MODE_RINGTONE` says the phone is ringing, and nothing else does.
+ */
+internal object RelayRingWatch {
+    const val MODE_NORMAL = 0
+    const val MODE_RINGTONE = 1
+    const val MODE_IN_CALL = 2
+    const val MODE_IN_COMMUNICATION = 3
+
+    fun inCall(mode: Int) = mode == MODE_IN_CALL || mode == MODE_IN_COMMUNICATION
+
+    /** The ring may end only once the phone itself has stopped ringing. */
+    fun stopOnRemoval(mode: Int) = mode != MODE_RINGTONE
+
+    /**
+     * Why an in-progress ring should end, or null to keep ringing.
+     *
+     * [startMode] guards against apps that already hold the audio session
+     * while they ring: only a change into an in-call mode is an answer.
+     */
+    fun reason(startMode: Int, sawRingtone: Boolean, mode: Int): String? = when {
+        inCall(mode) && !inCall(startMode) -> "answered"
+        sawRingtone && mode == MODE_NORMAL -> "ended"
+        else -> null
+    }
+}
