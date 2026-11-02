@@ -67,11 +67,22 @@ hardware.
 ## Build and install
 
 Needs the Flutter SDK and an Android SDK. On this machine Flutter lives at
-`C:\src\flutter`.
+`C:\src\flutter` and is pinned to JDK 17 (`flutter config --jdk-dir`), because
+the default `java` on PATH is 25 and Gradle 8.14 rejects it.
 
 ```bash
 cd app && flutter build apk --release
 ```
+
+The first build downloads Android NDK 28.2.13676358 (~2.3 GB), which
+`integration_test` pins. That download failed once here and succeeded on a
+plain retry, so retry before believing a `Failed to install ndk;28.2…` error.
+A half-written `ndk/28.2.13676358` holding only `.installer` has to be moved
+aside first, or configuration fails with `[CXX1101] … did not have a
+source.properties file`.
+
+Build release, not debug: a debug APK here is ~1.4 GB (Vulkan validation
+layers, unstripped engine libraries), the release APK ~53 MB.
 
 Install the APK from `app/build/app/outputs/flutter-apk/`, then, in order:
 

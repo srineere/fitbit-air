@@ -4,7 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RelayCallRulesTest {
-    private val classify = RelayAlertClassifier::classify
+    private fun classify(
+        category: String?,
+        ongoing: Boolean,
+        fullScreen: Boolean,
+        channelId: String?,
+    ) = RelayAlertClassifier.classify(category, ongoing, fullScreen, channelId)
 
     @Test fun `a declared call rings whether or not it is ongoing`() {
         assertEquals(RelayAlertKind.CALL, classify("call", true, false, "messages"))
@@ -41,7 +46,11 @@ class RelayCallRulesTest {
         val call = RelayAlertKind.CALL
         assertEquals(RelayPreset.RING, config.match("com.whatsapp", setOf("alice"), null, call)?.preset)
         assertEquals(RelayPreset.HIGH, config.match("com.instagram", emptySet(), null, call)?.preset)
-        assertEquals(RelayPreset.LOW, config.match("com.whatsapp", emptySet(), null)?.preset)
+        assertEquals(RelayPreset.LOW, config.match("com.instagram", emptySet(), null)?.preset)
+        // The same unsaved WhatsApp contact is silenced as a message and still
+        // rings as a call: "everyone else: silent" is a rule about messages.
+        assertNull(config.match("com.whatsapp", emptySet(), null))
+        assertEquals(RelayPreset.RING, config.match("com.whatsapp", emptySet(), null, call)?.preset)
     }
 
     @Test fun `a muted call preset drops the alert rather than ringing silently`() {
