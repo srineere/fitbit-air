@@ -1,0 +1,121 @@
+# Synthetic, harmless messages labelled by hand: label<TAB>text. Used to measure accuracy, not to tune word by word.
+urgent	Can you call me asap? The deploy is stuck
+urgent	Server is down, need you right now
+urgent	Please call back, it's urgent
+urgent	The client is waiting in the lobby, come now!!
+urgent	Production outage, everyone join the call
+urgent	Where are you? The meeting started 10 minutes ago!!
+urgent	Need your help immediately with the release
+urgent	Answer your phone please
+urgent	Locked out of the office, can you come right away?
+urgent	Pick up the phone, something is wrong with the build
+urgent	Deadline is in one hour and the upload failed!!
+urgent	URGENT: the venue changed, check the new address
+urgent	🚨 the alarm in the server room went off
+urgent	Fire drill now, leave the building
+urgent	Reply asap, the courier needs the door code
+urgent	Is everything ok? You missed the call
+urgent	Time sensitive: sign the form before noon
+urgent	Can you come quick? The car won't start
+urgent	Call me back as soon as possible
+urgent	CRITICAL alert on the database cluster
+urgent	Ruf mich bitte sofort an
+urgent	Dringend: der Server ist ausgefallen
+urgent	Wo bist du? Wir warten alle!!
+urgent	Geh ran, es ist wichtig!!
+urgent	Notfall im Büro, kannst du kommen?
+urgent	Bitte melde dich so schnell wie möglich
+urgent	Brauche dringend deine Hilfe beim Upload
+urgent	Komm schnell, der Bus fährt gleich ab
+urgent	Die Abgabefrist ist in einer Stunde!!
+urgent	Feueralarm, alle raus aus dem Gebäude, sofort
+urgent	Nimm ab, ist was passiert?
+urgent	Achtung!! Termin wurde vorverlegt, jetzt los
+urgent	Bitte umgehend zurückrufen
+urgent	Ich steh vor der Tür und komm nicht rein, ruf an
+urgent	Stromausfall im Labor, Notfallplan aktivieren
+urgent	Kannst du mich zurückrufen? Eilt!!
+urgent	SOFORT ins Meeting bitte
+urgent	Wichtige Frage, bitte schnell antworten!!
+urgent	Evakuierung des Gebäudes um 15 Uhr, das ist keine Übung
+urgent	Die Polizei steht vor dem Laden, komm bitte
+negative	The meeting was cancelled again
+negative	Ugh, the train is delayed by an hour
+negative	Sorry, I can't make it tonight
+negative	The demo crashed in front of everyone, terrible day
+negative	I'm really disappointed with how the review went
+negative	This laptop is so annoying, it keeps freezing
+negative	Bad news, the flat is gone
+negative	Unfortunately the shop is closed on Sundays
+negative	My order got lost in the mail
+negative	The weather ruined our picnic
+negative	I hate when the printer jams
+negative	That went wrong, the payment was declined
+negative	Not happy with the new layout at all
+negative	The concert got postponed, what a shame
+negative	Feeling stressed about the exam
+negative	This update broke everything
+negative	The hotel was awful and noisy
+negative	I'm frustrated, nothing works today
+negative	We lost the match 0:3
+negative	The package arrived broken
+negative	Leider abgesagt 😢
+negative	Der Zug hat schon wieder Verspätung
+negative	Das Konzert wurde verschoben, echt schade
+negative	Ich bin total genervt von dem Drucker
+negative	Mist, ich hab den Bus verpasst
+negative	Die Präsentation lief richtig schlecht
+negative	Das Paket kam kaputt an
+negative	Heute ist so ein Scheißtag
+negative	Ich bin echt enttäuscht von dem Ergebnis
+negative	Wir haben ein Riesenproblem mit der Heizung
+negative	Das neue Update ist eine Katastrophe
+negative	Tut mir leid, ich schaffe es heute nicht
+negative	Das Wetter ist furchtbar, Picknick fällt aus
+negative	Der Laptop ist abgestürzt und alles ist weg
+negative	Ich hab keine Lust mehr, alles nervt
+negative	Die Bewerbung wurde abgelehnt
+negative	Das Hotel war unschön und laut
+negative	Schon wieder Stau, das ist so ärgerlich
+negative	Das Spiel haben wir leider verloren
+negative	Das klappt so überhaupt nicht
+neutral	See you at 7 at the usual place
+neutral	Thanks, sounds good!
+neutral	Can you pick up bread on the way home?
+neutral	The meeting is moved to Thursday
+neutral	I'm home now
+neutral	Great job on the presentation today
+neutral	Not bad at all, I liked it
+neutral	No problem, take your time
+neutral	Did you see the new episode?
+neutral	The package arrived, thanks
+neutral	Let's grab lunch tomorrow
+neutral	ok 👍
+neutral	Hell yeah, we won!
+neutral	Happy birthday! 🎉
+neutral	The train is on time today
+neutral	Here is the link to the slides
+neutral	I'll be there in 20 minutes
+neutral	Nice weather for a walk
+neutral	What time does the shop open?
+neutral	Good morning, coffee is ready
+neutral	Bis später, ich bin unterwegs
+neutral	Danke, das passt super
+neutral	Kannst du Brot mitbringen?
+neutral	Das Meeting ist jetzt am Donnerstag
+neutral	Die Bahn war heute pünktlich
+neutral	Das Kind war heute im Bad
+neutral	Das war nicht schlecht, hat Spaß gemacht
+neutral	Kein Problem, lass dir Zeit
+neutral	Alles gut, keine Sorgen
+neutral	Wir sehen uns um 7
+neutral	Herzlichen Glückwunsch zum Geburtstag 🎉
+neutral	Ich bin in 20 Minuten da
+neutral	Schönes Wetter heute, gehen wir raus?
+neutral	Hier ist der Link zu den Folien
+neutral	Hast du die neue Folge gesehen?
+neutral	Guten Morgen, Kaffee ist fertig
+neutral	Das Paket ist angekommen, danke
+neutral	Ich hab einen Gutschein für das Kino
+neutral	Lust auf ein Abenteuer am Wochenende?
+neutral	Super, freu mich drauf!

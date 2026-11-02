@@ -1,0 +1,31 @@
+name: New Air firmware
+description: Tell us whether Air Relay works on a firmware version it hasn't been tested with.
+labels: [firmware]
+body:
+  - type: input
+    id: firmware
+    attributes:
+      label: Air firmware
+      description: Shown under Device in Air Relay as "not yet tested".
+    validations:
+      required: true
+  - type: dropdown
+    id: works
+    attributes:
+      label: Does it work?
+      options:
+        - Everything works (vibrations, battery, Google Health sync)
+        - Partly
+        - Nothing reaches the Air
+    validations:
+      required: true
+  - type: input
+    id: phone
+    attributes:
+      label: Phone, Android version and Air Relay version
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details (optional)

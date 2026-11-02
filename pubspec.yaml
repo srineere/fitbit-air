@@ -1,0 +1,39 @@
+name: fitbit_air
+description: Experimental Android Bluetooth access to Fitbit Air, including haptics, live heart rate, device information, and diagnostics.
+version: 0.2.0
+homepage: https://github.com/ThoreKoritzius/fitbit-air
+repository: https://github.com/ThoreKoritzius/fitbit-air
+issue_tracker: https://github.com/ThoreKoritzius/fitbit-air/issues
+topics:
+  - bluetooth
+  - wearable
+  - fitbit
+  - haptics
+
+environment:
+  sdk: ^3.11.4
+  flutter: '>=3.3.0'
+
+dependencies:
+  clock: ^1.1.2
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  fake_async: ^1.3.3
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  # License texts for the bundled native transport; see FitbitAir.registerLicenses.
+  assets:
+    - LICENSE-APACHE-2.0
+    - third_party/golden-gate/NOTICE
+    - third_party/mbedtls/LICENSE
+    - third_party/lwip/COPYING
+  plugin:
+    platforms:
+      android:
+        package: dev.airpulse.fitbit_air
+        pluginClass: FitbitAirPlugin

@@ -1,0 +1,49 @@
+name: Something isn't working
+description: Vibrations missing, errors, Google Health sync problems or crashes.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The Air's interface is undocumented, so your phone and firmware details help most.
+        Find the firmware under **Device** in Air Relay, or in **About**.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you expected, what happened instead, and roughly when.
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Air firmware
+      placeholder: 67.20001.253.2
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Air Relay or fitbit_air version
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and Android version
+      placeholder: Pixel 7 Pro, Android 16
+    validations:
+      required: true
+  - type: dropdown
+    id: sync
+    attributes:
+      label: Does Google Health still sync?
+      options: ["Yes", "No, it stalls", "Not sure"]
+  - type: textarea
+    id: report
+    attributes:
+      label: Diagnostic report (optional)
+      description: |
+        Home → Activity details → **Copy diagnostic report**. It contains no message text, but lists the app packages that triggered alerts. Review it before posting.
+      render: json

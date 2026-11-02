@@ -1,0 +1,33 @@
+name: Native transport
+
+on:
+  push:
+    paths: ['tool/native/**', 'android/src/main/jniLibs/**', '.github/workflows/native.yml']
+  pull_request:
+    paths: ['tool/native/**', 'android/src/main/jniLibs/**', '.github/workflows/native.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned NDK
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"'
+      # Rebuild from pinned public source and require byte-identical output.
+      - name: Rebuild and compare with committed libraries
+        run: python3 tool/native/build.py --ndk "$ANDROID_HOME/ndk/28.2.13676358" --abi ${{ matrix.abi }} --check --out build/native-out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: golden-gate-${{ matrix.abi }}
+          path: build/native-out/
+          if-no-files-found: warn
