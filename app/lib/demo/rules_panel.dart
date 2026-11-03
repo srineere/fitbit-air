@@ -196,16 +196,15 @@ class _RulesPanelState extends State<RulesPanel> {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // The checkbox decides whether this app is in play at all;
+                  // what each kind of alert feels like lives in its own row,
+                  // so neither is hidden behind tapping the other.
                   ListTile(
                     key: ValueKey('app-$pkg'),
                     contentPadding: EdgeInsets.zero,
                     leading: AppIcon(encoded: icon),
                     title: Text(label),
-                    subtitle: Text(
-                      '${enabled ? "On" : "Off"} · Notifications: '
-                      '${preset?.label ?? "Default: ${state.settings.defaultPreset.label}"}',
-                    ),
-                    trailing: Switch(
+                    trailing: Checkbox(
                       key: ValueKey('app-enabled-$pkg'),
                       value: enabled,
                       onChanged: state.changingRelay
@@ -213,34 +212,50 @@ class _RulesPanelState extends State<RulesPanel> {
                           : (value) => widget.perform(
                               () => state.saveAppRule(
                                 pkg,
-                                value,
+                                value ?? false,
                                 preset,
                                 callPreset,
                               ),
                             ),
                     ),
-                    onTap: () => editVibration(
-                      context,
-                      state,
-                      title: '$label notifications',
-                      initial: preset,
-                      onSave: (value) =>
-                          state.saveAppRule(pkg, enabled, value, callPreset),
-                    ),
+                    onTap: state.changingRelay
+                        ? null
+                        : () => widget.perform(
+                            () => state.saveAppRule(
+                              pkg,
+                              !enabled,
+                              preset,
+                              callPreset,
+                            ),
+                          ),
                   ),
-                  // Calls from this app are ranked separately: the same app
-                  // sends both a chat message and a ringing call.
-                  if (enabled)
-                    ListTile(
-                      key: ValueKey('app-calls-$pkg'),
-                      contentPadding: const EdgeInsets.only(left: 56),
-                      dense: true,
-                      leading: const Icon(Icons.call, size: 20),
-                      title: const Text('Calls'),
-                      subtitle: Text(
-                        callPreset?.label ??
-                            'Default: ${state.settings.defaultCallPreset.label}',
+                  if (enabled) ...[
+                    _alertRow(
+                      key: ValueKey('app-notifications-$pkg'),
+                      icon: Icons.chat_bubble_outline,
+                      title: 'Notifications',
+                      value:
+                          preset?.label ??
+                          'Default: ${state.settings.defaultPreset.label}',
+                      onTap: () => editVibration(
+                        context,
+                        state,
+                        title: '$label notifications',
+                        initial: preset,
+                        // Silent here is what makes "calls only" possible:
+                        // the app stays on, so its calls still ring.
+                        allowMute: true,
+                        onSave: (value) =>
+                            state.saveAppRule(pkg, enabled, value, callPreset),
                       ),
+                    ),
+                    _alertRow(
+                      key: ValueKey('app-calls-$pkg'),
+                      icon: Icons.call_outlined,
+                      title: 'Calls',
+                      value:
+                          callPreset?.label ??
+                          'Default: ${state.settings.defaultCallPreset.label}',
                       onTap: () => editVibration(
                         context,
                         state,
@@ -254,6 +269,7 @@ class _RulesPanelState extends State<RulesPanel> {
                             state.saveAppRule(pkg, enabled, preset, value),
                       ),
                     ),
+                  ],
                 ],
               );
             },
@@ -614,3 +630,23 @@ class _RingTimingEditorState extends State<_RingTimingEditor> {
     ),
   );
 }
+
+/// One kind of alert under an app: what it is, what it feels like, and a way
+/// to change it. Indented so it reads as belonging to the app above it.
+Widget _alertRow({
+  required Key key,
+  required IconData icon,
+  required String title,
+  required String value,
+  required VoidCallback onTap,
+}) => ListTile(
+  key: key,
+  contentPadding: const EdgeInsets.only(left: 40, right: 4),
+  dense: true,
+  visualDensity: VisualDensity.compact,
+  leading: Icon(icon, size: 20),
+  title: Text(title),
+  subtitle: Text(value),
+  trailing: const Icon(Icons.chevron_right, size: 20),
+  onTap: onTap,
+);

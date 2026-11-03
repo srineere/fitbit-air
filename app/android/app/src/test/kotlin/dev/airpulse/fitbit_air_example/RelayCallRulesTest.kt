@@ -60,6 +60,25 @@ class RelayCallRulesTest {
         assertEquals(RelayPreset.RING, config.match("com.whatsapp", emptySet(), null, call)?.preset)
     }
 
+    @Test fun `an app can be silent for messages and still ring for calls`() {
+        val config = RelayRuleConfig(
+            apps = mapOf("com.whatsapp" to RelayAppRule(true, RelayPreset.MUTE, RelayPreset.RING)),
+        )
+        assertNull(config.match("com.whatsapp", emptySet(), null))
+        assertEquals(
+            RelayPreset.RING,
+            config.match("com.whatsapp", emptySet(), null, RelayAlertKind.CALL)?.preset,
+        )
+    }
+
+    @Test fun `and the other way round, messages without calls`() {
+        val config = RelayRuleConfig(
+            apps = mapOf("com.whatsapp" to RelayAppRule(true, RelayPreset.HIGH, RelayPreset.MUTE)),
+        )
+        assertEquals(RelayPreset.HIGH, config.match("com.whatsapp", emptySet(), null)?.preset)
+        assertNull(config.match("com.whatsapp", emptySet(), null, RelayAlertKind.CALL))
+    }
+
     @Test fun `a muted call preset drops the alert rather than ringing silently`() {
         val config = RelayRuleConfig(
             defaultCallPreset = RelayPreset.MUTE,

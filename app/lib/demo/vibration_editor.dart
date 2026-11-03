@@ -218,7 +218,9 @@ class _VibrationEditorState extends State<_VibrationEditor> {
             const Padding(
               padding: EdgeInsets.only(top: 12),
               child: Text(
-                'Use app default removes the custom override. Selected-chat restrictions still apply.',
+                'Silent stops this from vibrating at all, and is set '
+                'separately for notifications and for calls: silencing one '
+                'leaves the other alone.',
               ),
             ),
           SizedBox(height: MediaQuery.viewInsetsOf(context).bottom + 16),
