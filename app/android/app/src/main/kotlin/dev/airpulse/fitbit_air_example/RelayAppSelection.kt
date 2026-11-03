@@ -2,6 +2,7 @@ package dev.airpulse.fitbit_air_example
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.util.Base64
@@ -36,6 +37,37 @@ internal object RelayAppSelection {
 
     private val PULSE_STYLES = setOf("double", "single")
 
+    /**
+     * Whether this app can receive calls, so only apps that can are offered a
+     * call rule.
+     *
+     * `MANAGE_OWN_CALLS` is what an app needs to put a call through the
+     * telecom framework, and messaging apps that call declare it. `CALL_PHONE`
+     * is no use as a signal: Calendar and Messages hold it so a tapped number
+     * dials out, and neither ever rings.
+     */
+    private fun canReceiveCalls(context: Context, packageName: String): Boolean = runCatching {
+        @Suppress("DEPRECATION")
+        context.packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+            .requestedPermissions?.contains("android.permission.MANAGE_OWN_CALLS") == true
+    }.getOrDefault(false)
+
+    /**
+     * Apps actually seen ringing, in case one calls without declaring it.
+     * Observation beats inference: an app that has rung is a calling app
+     * whatever its manifest says.
+     */
+    fun rememberCalling(context: Context, packageName: String) {
+        val prefs = context.getSharedPreferences("calendar_relay", Context.MODE_PRIVATE)
+        val seen = prefs.getStringSet("calling_apps", emptySet())!!
+        if (packageName in seen || seen.size >= 64) return
+        prefs.edit().putStringSet("calling_apps", seen + packageName).apply()
+    }
+
+    private fun seenCalling(context: Context): Set<String> = context
+        .getSharedPreferences("calendar_relay", Context.MODE_PRIVATE)
+        .getStringSet("calling_apps", emptySet())!!
+
     @Suppress("DEPRECATION")
     fun available(context: Context): List<Map<String, String>> {
         val manager = context.packageManager
@@ -48,8 +80,13 @@ internal object RelayAppSelection {
         // Keep saved selections visible even after an app is uninstalled.
         for (name in selected(context)) apps.putIfAbsent(name,
             if (name == DEFAULT_APP) "Google Calendar" else name)
+        val rang = seenCalling(context)
         return apps.entries.sortedBy { it.value.lowercase() }.map { app ->
-            val entry = mutableMapOf("packageName" to app.key, "label" to app.value)
+            val entry = mutableMapOf(
+                "packageName" to app.key,
+                "label" to app.value,
+                "calls" to (app.key in rang || canReceiveCalls(context, app.key)).toString(),
+            )
             runCatching {
                 val icon = manager.getApplicationIcon(app.key)
                 val bitmap = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888)

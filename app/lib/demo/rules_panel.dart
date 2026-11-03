@@ -179,6 +179,9 @@ class _RulesPanelState extends State<RulesPanel> {
               final enabled = state.selectedApps.contains(pkg);
               final preset = rule?.preset;
               final callPreset = rule?.callPreset;
+              // Calendar and Messages never ring, so they are not offered a
+              // call rule; one already set stays visible so it can be undone.
+              final canCall = app['calls'] == 'true' || callPreset != null;
               final icon = app['icon'] as String?;
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -236,33 +239,34 @@ class _RulesPanelState extends State<RulesPanel> {
                             state.saveAppRule(pkg, enabled, value, callPreset),
                       ),
                     ),
-                    _alertRow(
-                      key: ValueKey('app-calls-$pkg'),
-                      icon: Icons.call_outlined,
-                      title: 'Calls',
-                      value:
-                          callPreset?.label ??
-                          'Default: ${state.settings.defaultCallPreset.label}',
-                      onTap: () => editVibration(
-                        context,
-                        state,
-                        title: '$label calls',
-                        initial: callPreset,
-                        allowMute: true,
-                        allowRing: true,
-                        inheritedPreset: state.settings.defaultCallPreset,
-                        ringGapMillis:
-                            rule?.ringGapMillis ??
-                            state.settings.ringGapMillis,
-                        ringMaxSeconds:
-                            rule?.ringMaxSeconds ??
-                            state.settings.ringMaxSeconds,
-                        onRingTiming: (gapMillis, maxSeconds) => state
-                            .saveAppRingSettings(pkg, gapMillis, maxSeconds),
-                        onSave: (value) =>
-                            state.saveAppRule(pkg, enabled, preset, value),
+                    if (canCall)
+                        _alertRow(
+                          key: ValueKey('app-calls-$pkg'),
+                        icon: Icons.call_outlined,
+                        title: 'Calls',
+                        value:
+                            callPreset?.label ??
+                            'Default: ${state.settings.defaultCallPreset.label}',
+                        onTap: () => editVibration(
+                          context,
+                          state,
+                          title: '$label calls',
+                          initial: callPreset,
+                          allowMute: true,
+                          allowRing: true,
+                          inheritedPreset: state.settings.defaultCallPreset,
+                          ringGapMillis:
+                              rule?.ringGapMillis ??
+                              state.settings.ringGapMillis,
+                          ringMaxSeconds:
+                              rule?.ringMaxSeconds ??
+                              state.settings.ringMaxSeconds,
+                          onRingTiming: (gapMillis, maxSeconds) => state
+                              .saveAppRingSettings(pkg, gapMillis, maxSeconds),
+                          onSave: (value) =>
+                              state.saveAppRule(pkg, enabled, preset, value),
+                        ),
                       ),
-                    ),
                   ],
                 ],
               );
