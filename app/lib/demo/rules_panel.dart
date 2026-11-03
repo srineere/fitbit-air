@@ -251,6 +251,14 @@ class _RulesPanelState extends State<RulesPanel> {
                         allowMute: true,
                         allowRing: true,
                         inheritedPreset: state.settings.defaultCallPreset,
+                        ringGapMillis:
+                            rule?.ringGapMillis ??
+                            state.settings.ringGapMillis,
+                        ringMaxSeconds:
+                            rule?.ringMaxSeconds ??
+                            state.settings.ringMaxSeconds,
+                        onRingTiming: (gapMillis, maxSeconds) => state
+                            .saveAppRingSettings(pkg, gapMillis, maxSeconds),
                         onSave: (value) =>
                             state.saveAppRule(pkg, enabled, preset, value),
                       ),

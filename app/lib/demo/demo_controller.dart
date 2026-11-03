@@ -787,6 +787,17 @@ class DemoController extends ChangeNotifier {
   Future<void> saveDefaultCallPreset(VibrationPreset preset) =>
       _relayCall('saveDefaultCallPreset', {'preset': preset.id});
 
+  /// One app's own ring cadence, so apps can be told apart by feel.
+  Future<void> saveAppRingSettings(
+    String packageName,
+    int gapMillis,
+    int maxSeconds,
+  ) => _relayCall('saveAppRingSettings', {
+    'packageName': packageName,
+    'gapMillis': gapMillis,
+    'maxSeconds': maxSeconds,
+  });
+
   /// How fast a ringing call pulses, and when it gives up.
   Future<void> saveRingSettings(int gapMillis, int maxSeconds) =>
       _relayCall('saveRingSettings', {

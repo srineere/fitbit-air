@@ -292,6 +292,22 @@ class RelayCallRulesTest {
         )
     }
 
+    @Test fun `an app can ring at its own cadence`() {
+        val own = RelayRingSettings(300, 30)
+        val config = RelayRuleConfig(
+            apps = mapOf(
+                "com.whatsapp" to RelayAppRule(true, ring = own),
+                dialer to RelayAppRule(true),
+            ),
+            ring = RelayRingSettings(900, 60),
+        )
+        // Telling one app from another by feel is the whole point.
+        assertEquals(own, config.ringFor("com.whatsapp"))
+        assertEquals(RelayRingSettings(900, 60), config.ringFor(dialer))
+        // An app nobody has a rule for still uses the shared cadence.
+        assertEquals(RelayRingSettings(900, 60), config.ringFor("com.unknown"))
+    }
+
     @Test fun `only calls may repeat`() {
         assertTrue(RelayPreset.RING.callsOnly)
         assertFalse(RelayPreset.DOUBLE.callsOnly)

@@ -48,10 +48,14 @@ internal object RelayRuleStore {
                 else RelayPreset.parse(json.getString("defaultCallPreset")),
             apps = apps.keys().asSequence().associateWith { key ->
                 val value = apps.getJSONObject(key)
+                val ownRing = value.optJSONObject("ring")
                 RelayAppRule(
                     value.getBoolean("enabled"),
                     if (value.isNull("preset")) null else RelayPreset.parse(value.getString("preset")),
                     if (value.isNull("callPreset")) null else RelayPreset.parse(value.getString("callPreset")),
+                    if (ownRing == null) null else RelayRingSettings(
+                        ownRing.getInt("gapMillis"), ownRing.getInt("maxSeconds"),
+                    ),
                 )
             },
             chats = if (version == 1) {
@@ -87,7 +91,10 @@ internal object RelayRuleStore {
         config.apps.forEach { (key, rule) ->
             apps.put(key, JSONObject().put("enabled", rule.enabled)
                 .put("preset", rule.preset?.id ?: JSONObject.NULL)
-                .put("callPreset", rule.callPreset?.id ?: JSONObject.NULL))
+                .put("callPreset", rule.callPreset?.id ?: JSONObject.NULL)
+                .put("ring", rule.ring?.let {
+                    JSONObject().put("gapMillis", it.gapMillis).put("maxSeconds", it.maxSeconds)
+                } ?: JSONObject.NULL))
         }
         val chats = JSONObject()
         config.chats.forEach { (id, chat) ->
@@ -139,7 +146,9 @@ internal object RelayRuleStore {
             "defaultCallPreset" to c.defaultCallPreset.id,
             "ringGapMillis" to c.ring.gapMillis, "ringMaxSeconds" to c.ring.maxSeconds,
             "apps" to c.apps.mapValues { (_, r) ->
-                mapOf("enabled" to r.enabled, "preset" to r.preset?.id, "callPreset" to r.callPreset?.id)
+                mapOf("enabled" to r.enabled, "preset" to r.preset?.id,
+                    "callPreset" to r.callPreset?.id,
+                    "ringGapMillis" to r.ring?.gapMillis, "ringMaxSeconds" to r.ring?.maxSeconds)
             },
             "onlySavedCallers" to c.onlySavedCallers,
             "callers" to c.callers.map { (id, caller) ->

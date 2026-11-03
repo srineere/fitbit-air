@@ -99,12 +99,18 @@ class AppNotificationRule {
     required this.enabled,
     this.preset,
     this.callPreset,
+    this.ringGapMillis,
+    this.ringMaxSeconds,
   });
   final bool enabled;
   final VibrationPreset? preset;
 
   /// Null uses [RelaySettings.defaultCallPreset] for this app's calls.
   final VibrationPreset? callPreset;
+
+  /// Its own ring cadence; null uses the shared one.
+  final int? ringGapMillis;
+  final int? ringMaxSeconds;
 }
 
 /// A WhatsApp chat saved on this phone. [preset] null uses the app vibration.
@@ -242,6 +248,8 @@ class RelaySettings {
             callPreset: rule['callPreset'] == null
                 ? null
                 : VibrationPreset.parse(rule['callPreset']),
+            ringGapMillis: rule['ringGapMillis'] as int?,
+            ringMaxSeconds: rule['ringMaxSeconds'] as int?,
           ),
         );
       }),

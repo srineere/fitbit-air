@@ -63,6 +63,8 @@ class CalendarRelayService : Service() {
          * in-call mode means the call was picked up.
          */
         val startMode: Int,
+        /** Resolved when the ring starts, so settings cannot change under it. */
+        val settings: RelayRingSettings,
     ) {
         /** The phone was heard ringing, so a return to silence means it ended. */
         var sawRingtone: Boolean = startMode == RelayRingWatch.MODE_RINGTONE
@@ -362,9 +364,10 @@ class CalendarRelayService : Service() {
     }
 
     private fun startRing(key: String, packageName: String, match: RelayMatch) {
-        val session = RingSession(key, packageName, match, System.currentTimeMillis(), audioMode())
+        val session = RingSession(key, packageName, match, System.currentTimeMillis(), audioMode(),
+            RelayRuleStore.read(this).ringFor(packageName))
         ring = session
-        Log.i(TAG, "ring start pkg=$packageName gap=${ringSettings.gapMillis}ms max=${ringSettings.maxSeconds}s mode=${session.startMode}")
+        Log.i(TAG, "ring start pkg=$packageName gap=${session.settings.gapMillis}ms max=${session.settings.maxSeconds}s mode=${session.startMode}")
         record(nextId(), packageName, session.startedAt, "ring_started", match = match)
         refreshNotification()
         handler.postDelayed(ringWatch, RING_WATCH_MILLIS)
@@ -423,8 +426,8 @@ class CalendarRelayService : Service() {
             if (ring === session) stopRing("ring_finished")
         }
         worker.invokeMethod("ring", mapOf(
-            "gapMillis" to ringSettings.gapMillis,
-            "maxMillis" to ringSettings.maxMillis.toInt(),
+            "gapMillis" to session.settings.gapMillis,
+            "maxMillis" to session.settings.maxMillis.toInt(),
             "intensity" to session.match.preset.intensity,
         ), object : MethodChannel.Result {
             override fun success(result: Any?) { finished(RelayWorkerResult.decode(result)) }

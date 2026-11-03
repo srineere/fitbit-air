@@ -77,6 +77,8 @@ internal data class RelayAppRule(
     val enabled: Boolean,
     val preset: RelayPreset? = null,
     val callPreset: RelayPreset? = null,
+    /** Its own ring cadence; null uses the shared one. */
+    val ring: RelayRingSettings? = null,
 )
 /**
  * A WhatsApp chat the user saved. [kind] is "shortcut" (stable conversation ID) or
@@ -152,6 +154,13 @@ internal data class RelayRuleConfig(
     val everyoneElseSilent: Boolean = false,
 ) {
     val selectedPackages: Set<String> get() = apps.filterValues { it.enabled }.keys
+
+    /**
+     * How this app's calls repeat. A cadence of its own is how one app is told
+     * from another by feel alone, without looking at the phone.
+     */
+    fun ringFor(packageName: String): RelayRingSettings =
+        apps[packageName]?.ring ?: ring
 
     fun match(
         packageName: String,

@@ -19,6 +19,13 @@ Future<void> editVibration(
 
   /// What this rule falls back to while nothing has been chosen for it.
   VibrationPreset? inheritedPreset,
+
+  /// Ring cadence for this rule. Supplied only where a cadence belongs to the
+  /// thing being edited, which is the app or the shared default, never one
+  /// caller: a ring is paced per app so apps can be told apart by feel.
+  int? ringGapMillis,
+  int? ringMaxSeconds,
+  Future<void> Function(int gapMillis, int maxSeconds)? onRingTiming,
 }) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
@@ -31,6 +38,9 @@ Future<void> editVibration(
     allowMute: allowMute,
     allowRing: allowRing,
     inheritedPreset: inheritedPreset,
+    ringGapMillis: ringGapMillis,
+    ringMaxSeconds: ringMaxSeconds,
+    onRingTiming: onRingTiming,
   ),
 );
 
@@ -43,6 +53,9 @@ class _VibrationEditor extends StatefulWidget {
     required this.allowMute,
     required this.allowRing,
     required this.inheritedPreset,
+    required this.ringGapMillis,
+    required this.ringMaxSeconds,
+    required this.onRingTiming,
   });
   final DemoController controller;
   final String title;
@@ -50,6 +63,9 @@ class _VibrationEditor extends StatefulWidget {
   final Future<void> Function(VibrationPreset?) onSave;
   final bool allowMute, allowRing;
   final VibrationPreset? inheritedPreset;
+  final int? ringGapMillis;
+  final int? ringMaxSeconds;
+  final Future<void> Function(int gapMillis, int maxSeconds)? onRingTiming;
   @override
   State<_VibrationEditor> createState() => _VibrationEditorState();
 }
@@ -59,9 +75,21 @@ class _VibrationEditorState extends State<_VibrationEditor> {
       widget.initial ??
       widget.inheritedPreset ??
       widget.controller.settings.defaultPreset;
+  late double gap = (widget.ringGapMillis ?? 700).toDouble();
+  late double maximum = (widget.ringMaxSeconds ?? 45).toDouble();
   bool working = false;
   String? error;
   String? feedback;
+
+  Future<void> _saveTiming() async {
+    final save = widget.onRingTiming;
+    if (save == null) return;
+    try {
+      await save(gap.round(), maximum.round());
+    } catch (_) {
+      if (mounted) setState(() => error = 'Could not save that. Try again.');
+    }
+  }
 
   @override
   void initState() {
@@ -204,6 +232,43 @@ class _VibrationEditorState extends State<_VibrationEditor> {
               'The Air has two strengths, and it keeps the one it was last '
               'sent. A lighter setting here is lighter for everything until '
               'something asks for the stronger one.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+          // Only a repeat has a cadence, and it sits under strength because it
+          // describes the same vibration rather than a different one.
+          if (selected.callsOnly && widget.onRingTiming != null) ...[
+            const Divider(height: 32),
+            Text('Repeat timing', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text('A pulse every ${gap.round()} ms'),
+            Slider(
+              key: const ValueKey('ring-gap'),
+              min: 250,
+              max: 2000,
+              divisions: 35,
+              value: gap,
+              label: '${gap.round()} ms',
+              onChanged: working ? null : (value) => setState(() => gap = value),
+              onChangeEnd: (_) => _saveTiming(),
+            ),
+            Text('Give up after ${maximum.round()} seconds'),
+            Slider(
+              key: const ValueKey('ring-maximum'),
+              min: 10,
+              max: 180,
+              divisions: 34,
+              value: maximum,
+              label: '${maximum.round()} s',
+              onChanged: working
+                  ? null
+                  : (value) => setState(() => maximum = value),
+              onChangeEnd: (_) => _saveTiming(),
+            ),
+            Text(
+              'The Air plays one pulse per change it notices, so too short a '
+              'gap merges buzzes into fewer, longer ones. While a call rings, '
+              'Google Health cannot sync.',
               style: theme.textTheme.bodySmall,
             ),
           ],

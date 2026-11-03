@@ -175,21 +175,12 @@ class _CallerRulesPageState extends State<CallerRulesPage> {
               initial: settings.defaultCallPreset,
               allowMute: true,
               allowRing: true,
+              ringGapMillis: settings.ringGapMillis,
+              ringMaxSeconds: settings.ringMaxSeconds,
+              onRingTiming: state.saveRingSettings,
               onSave: (preset) => state.saveDefaultCallPreset(preset!),
             ),
           ),
-          if (_repeatsAnyCall(settings))
-            ListTile(
-              key: const ValueKey('ring-timing'),
-              leading: const Icon(Icons.timer_outlined),
-              title: const Text('Repeat timing'),
-              subtitle: Text(
-                'A pulse every ${settings.ringGapMillis} ms · '
-                'stops after ${settings.ringMaxSeconds} s',
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => editRingTiming(context, state, widget.perform),
-            ),
           SwitchListTile(
             key: const ValueKey('only-saved-callers'),
             title: const Text('Only these callers ring'),
@@ -258,97 +249,4 @@ class _CallerRulesPageState extends State<CallerRulesPage> {
       ),
     );
   }
-}
-
-/// Repeat timing only matters when something is actually set to repeat.
-bool _repeatsAnyCall(RelaySettings settings) =>
-    settings.defaultCallPreset.pattern == VibrationPattern.ring ||
-    settings.apps.values.any(
-      (rule) => rule.enabled && rule.callPreset?.pattern == VibrationPattern.ring,
-    );
-
-Future<void> editRingTiming(
-  BuildContext context,
-  DemoController state,
-  void Function(Future<void> Function()) perform,
-) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  builder: (context) => _RingTimingEditor(state: state, perform: perform),
-);
-
-class _RingTimingEditor extends StatefulWidget {
-  const _RingTimingEditor({required this.state, required this.perform});
-  final DemoController state;
-  final void Function(Future<void> Function()) perform;
-  @override
-  State<_RingTimingEditor> createState() => _RingTimingEditorState();
-}
-
-class _RingTimingEditorState extends State<_RingTimingEditor> {
-  late double gap = widget.state.settings.ringGapMillis.toDouble();
-  late double maximum = widget.state.settings.ringMaxSeconds.toDouble();
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(
-      24,
-      24,
-      24,
-      MediaQuery.viewInsetsOf(context).bottom + 24,
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Repeat timing',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'A ring holds one connection open and pulses inside it. The Air '
-          'plays one pulse per change it notices, so too short a gap merges '
-          'buzzes into fewer, longer ones. While it rings, Google Health '
-          'cannot sync.',
-        ),
-        const SizedBox(height: 16),
-        Text('A pulse every ${gap.round()} ms'),
-        Slider(
-          key: const ValueKey('ring-gap'),
-          min: 250,
-          max: 2000,
-          divisions: 35,
-          value: gap,
-          label: '${gap.round()} ms',
-          onChanged: (value) => setState(() => gap = value),
-        ),
-        Text('Give up after ${maximum.round()} seconds'),
-        Slider(
-          key: const ValueKey('ring-maximum'),
-          min: 10,
-          max: 180,
-          divisions: 34,
-          value: maximum,
-          label: '${maximum.round()} s',
-          onChanged: (value) => setState(() => maximum = value),
-        ),
-        const SizedBox(height: 16),
-        FilledButton(
-          key: const ValueKey('save-ring-timing'),
-          onPressed: () {
-            widget.perform(
-              () => widget.state.saveRingSettings(
-                gap.round(),
-                maximum.round(),
-              ),
-            );
-            Navigator.pop(context);
-          },
-          child: const Text('Save'),
-        ),
-      ],
-    ),
-  );
 }

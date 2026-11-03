@@ -161,6 +161,20 @@ class MainActivity : FlutterActivity() {
                             RelayRuleStore.update(this) { it.copy(defaultCallPreset = preset) }
                             result.success(null)
                         }
+                        "saveAppRingSettings" -> {
+                            val pkg = requireNotNull(call.argument<String>("packageName"))
+                            val gap = call.argument<Int>("gapMillis")
+                            val max = call.argument<Int>("maxSeconds")
+                            RelayRuleStore.update(this) { config ->
+                                val rule = requireNotNull(config.apps[pkg]) { "Unknown app" }
+                                config.copy(apps = config.apps + (pkg to rule.copy(
+                                    // Both absent means "use the shared timing".
+                                    ring = if (gap == null || max == null) null
+                                    else RelayRingSettings(gap, max),
+                                )))
+                            }
+                            result.success(null)
+                        }
                         "saveRingSettings" -> {
                             val gap = requireNotNull(call.argument<Int>("gapMillis"))
                             val max = requireNotNull(call.argument<Int>("maxSeconds"))
