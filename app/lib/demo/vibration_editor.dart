@@ -95,8 +95,9 @@ class _VibrationEditorState extends State<_VibrationEditor> {
       working = true;
     });
     try {
+      // No confirmation: the radio moving is the confirmation, and a line of
+      // text appearing under every tap is noise.
       await widget.onSave(next);
-      if (mounted) setState(() => feedback = 'Saved');
     } catch (_) {
       if (mounted) {
         setState(() => error = 'Could not save that. Try again.');

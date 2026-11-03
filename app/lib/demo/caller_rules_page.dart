@@ -26,6 +26,25 @@ class CallerRulesPage extends StatefulWidget {
 
 class _CallerRulesPageState extends State<CallerRulesPage> {
   String search = '';
+  bool syncing = false;
+
+  /// Re-reads contacts and says what came back: a sync that changes nothing
+  /// is indistinguishable from one that did not run.
+  Future<void> _sync() async {
+    setState(() => syncing = true);
+    try {
+      await state.loadContacts();
+      if (!mounted) return;
+      final message = state.contactsGranted
+          ? '${state.contacts.length} contacts'
+          : 'Contacts are not allowed yet';
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => syncing = false);
+    }
+  }
 
   @override
   void initState() {
@@ -131,8 +150,13 @@ class _CallerRulesPageState extends State<CallerRulesPage> {
           IconButton(
             key: const ValueKey('resync-contacts'),
             tooltip: 'Resync contacts',
-            icon: const Icon(Icons.sync),
-            onPressed: () => widget.perform(state.loadContacts),
+            icon: syncing
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync),
+            onPressed: syncing ? null : () => widget.perform(_sync),
           ),
         ],
       ),
