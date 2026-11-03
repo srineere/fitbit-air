@@ -146,6 +146,19 @@ class MainActivity : FlutterActivity() {
                             }
                             result.success(null)
                         }
+                        "saveCallerRingSettings" -> {
+                            val id = requireNotNull(call.argument<String>("id"))
+                            val gap = call.argument<Int>("gapMillis")
+                            val max = call.argument<Int>("maxSeconds")
+                            RelayRuleStore.update(this) { config ->
+                                val caller = requireNotNull(config.callers[id]) { "Unknown caller" }
+                                config.copy(callers = config.callers + (id to caller.copy(
+                                    ring = if (gap == null || max == null) null
+                                    else RelayRingSettings(gap, max),
+                                )))
+                            }
+                            result.success(null)
+                        }
                         "removeCaller" -> {
                             val id = requireNotNull(call.argument<String>("id"))
                             RelayRuleStore.update(this) { it.copy(callers = it.callers - id) }

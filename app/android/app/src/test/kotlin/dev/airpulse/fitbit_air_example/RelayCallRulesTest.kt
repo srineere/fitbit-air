@@ -308,6 +308,25 @@ class RelayCallRulesTest {
         assertEquals(RelayRingSettings(900, 60), config.ringFor("com.unknown"))
     }
 
+    @Test fun `a caller's cadence outranks the app's`() {
+        val urgent = RelayRingSettings(300, 120)
+        val appPace = RelayRingSettings(900, 30)
+        val config = RelayRuleConfig(
+            apps = mapOf(dialer to RelayAppRule(true, ring = appPace)),
+            callers = mapOf("alice" to SavedCaller(dialer, "Alice", ring = urgent)),
+            ring = RelayRingSettings(700, 45),
+        )
+        // The whole point: a slow ring for everyone, a fast one for her.
+        assertEquals(urgent, config.ringFor(dialer, "alice"))
+        assertEquals(appPace, config.ringFor(dialer, "bob"))
+        assertEquals(appPace, config.ringFor(dialer, null))
+        // A saved caller without a cadence of their own falls back to the app.
+        val plain = config.copy(
+            callers = mapOf("alice" to SavedCaller(dialer, "Alice")),
+        )
+        assertEquals(appPace, plain.ringFor(dialer, "alice"))
+    }
+
     @Test fun `only calls may repeat`() {
         assertTrue(RelayPreset.RING.callsOnly)
         assertFalse(RelayPreset.DOUBLE.callsOnly)

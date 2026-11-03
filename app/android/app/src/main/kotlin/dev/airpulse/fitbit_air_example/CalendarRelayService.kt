@@ -323,7 +323,7 @@ class CalendarRelayService : Service() {
         if (ring != null) { record(nextId(), packageName, postedAt, "ringing", tone = category); return }
         if (match.preset == RelayPreset.RING) {
             if (rangAlready(key, now)) { record(nextId(), packageName, postedAt, "ring_done"); return }
-            startRing(key, packageName, match)
+            startRing(key, packageName, match, callerId)
             return
         }
         submit(packageName, postedAt, match)
@@ -363,9 +363,14 @@ class CalendarRelayService : Service() {
         if (key == lastRingKey) { lastRingKey = null; lastRingTimedOut = false }
     }
 
-    private fun startRing(key: String, packageName: String, match: RelayMatch) {
+    private fun startRing(
+        key: String,
+        packageName: String,
+        match: RelayMatch,
+        callerId: String?,
+    ) {
         val session = RingSession(key, packageName, match, System.currentTimeMillis(), audioMode(),
-            RelayRuleStore.read(this).ringFor(packageName))
+            RelayRuleStore.read(this).ringFor(packageName, callerId))
         ring = session
         Log.i(TAG, "ring start pkg=$packageName gap=${session.settings.gapMillis}ms max=${session.settings.maxSeconds}s mode=${session.startMode}")
         record(nextId(), packageName, session.startedAt, "ring_started", match = match)

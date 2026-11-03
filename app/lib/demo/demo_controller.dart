@@ -772,6 +772,17 @@ class DemoController extends ChangeNotifier {
     'detail': ?detail,
   });
 
+  /// One caller's own ring cadence, outranking the app's.
+  Future<void> saveCallerRingSettings(
+    String id,
+    int gapMillis,
+    int maxSeconds,
+  ) => _relayCall('saveCallerRingSettings', {
+    'id': id,
+    'gapMillis': gapMillis,
+    'maxSeconds': maxSeconds,
+  });
+
   Future<void> removeCaller(String id) => _relayCall('removeCaller', {'id': id});
 
   /// Only saved callers ring; everyone else stays silent.

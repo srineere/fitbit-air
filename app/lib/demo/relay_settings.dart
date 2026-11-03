@@ -148,6 +148,8 @@ class SavedCaller {
     required this.packageName,
     this.detail,
     this.preset,
+    this.ringGapMillis,
+    this.ringMaxSeconds,
   });
   final String id;
   final String label;
@@ -159,6 +161,10 @@ class SavedCaller {
   /// Null uses the app's call vibration; silent mutes this caller alone.
   final VibrationPreset? preset;
 
+  /// Its own ring cadence; null uses the app's, then the shared one.
+  final int? ringGapMillis;
+  final int? ringMaxSeconds;
+
   factory SavedCaller.fromMap(Map map) => SavedCaller(
     id: map['id'] as String,
     label: map['label'] as String? ?? 'Caller',
@@ -167,6 +173,8 @@ class SavedCaller {
         ? (map['detail'] as String).trim()
         : null,
     preset: map['preset'] == null ? null : VibrationPreset.parse(map['preset']),
+    ringGapMillis: map['ringGapMillis'] as int?,
+    ringMaxSeconds: map['ringMaxSeconds'] as int?,
   );
 }
 

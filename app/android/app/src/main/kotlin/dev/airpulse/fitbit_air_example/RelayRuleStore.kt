@@ -77,9 +77,13 @@ internal object RelayRuleStore {
             ),
             callers = callers?.keys()?.asSequence()?.associateWith { id ->
                 val caller = callers.getJSONObject(id)
+                val ownRing = caller.optJSONObject("ring")
                 SavedCaller(caller.getString("packageName"), caller.getString("label"),
                     if (caller.isNull("preset")) null else RelayPreset.parse(caller.getString("preset")),
-                    if (caller.isNull("detail")) null else caller.getString("detail"))
+                    if (caller.isNull("detail")) null else caller.getString("detail"),
+                    if (ownRing == null) null else RelayRingSettings(
+                        ownRing.getInt("gapMillis"), ownRing.getInt("maxSeconds"),
+                    ))
             }.orEmpty(),
             onlySavedCallers = json.optBoolean("onlySavedCallers", false),
             everyoneElseSilent = if (version == 1) legacy!!.second else json.getBoolean("everyoneElseSilent"),
@@ -106,7 +110,10 @@ internal object RelayRuleStore {
         config.callers.forEach { (id, caller) ->
             callers.put(id, JSONObject().put("packageName", caller.packageName)
                 .put("label", caller.label).put("preset", caller.preset?.id ?: JSONObject.NULL)
-                .put("detail", caller.detail ?: JSONObject.NULL))
+                .put("detail", caller.detail ?: JSONObject.NULL)
+                .put("ring", caller.ring?.let {
+                    JSONObject().put("gapMillis", it.gapMillis).put("maxSeconds", it.maxSeconds)
+                } ?: JSONObject.NULL))
         }
         val json = JSONObject().put("version", 4).put("defaultPreset", config.defaultPreset.id)
             .put("callers", callers).put("onlySavedCallers", config.onlySavedCallers)
@@ -154,7 +161,9 @@ internal object RelayRuleStore {
             "callers" to c.callers.map { (id, caller) ->
                 mapOf("id" to id, "packageName" to caller.packageName,
                     "label" to caller.label, "preset" to caller.preset?.id,
-                    "detail" to caller.detail)
+                    "detail" to caller.detail,
+                    "ringGapMillis" to caller.ring?.gapMillis,
+                    "ringMaxSeconds" to caller.ring?.maxSeconds)
             },
             "recentCallers" to RelayRecentCallers.list(c.callers.keys),
             "chats" to c.chats.map { (id, chat) ->

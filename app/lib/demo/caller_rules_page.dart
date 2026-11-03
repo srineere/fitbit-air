@@ -78,6 +78,14 @@ class _CallerRulesPageState extends State<CallerRulesPage> {
         allowMute: true,
         allowRing: true,
         inheritedPreset: settings.defaultCallPreset,
+        ringGapMillis: caller.ringGapMillis ?? settings.ringGapMillis,
+        ringMaxSeconds: caller.ringMaxSeconds ?? settings.ringMaxSeconds,
+        // A caller must exist before it can keep a cadence, so a brand new one
+        // takes its vibration first and paces it on the next visit.
+        onRingTiming: isNew
+            ? null
+            : (gapMillis, maxSeconds) =>
+                  state.saveCallerRingSettings(caller.id, gapMillis, maxSeconds),
         onSave: (value) => state.saveCaller(
           caller.id,
           value,

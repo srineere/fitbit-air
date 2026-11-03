@@ -101,6 +101,8 @@ internal data class SavedCaller(
     val preset: RelayPreset? = null,
     /** The number, so a contact with several can tell its rules apart. */
     val detail: String? = null,
+    /** Its own ring cadence; null uses the app's, then the shared one. */
+    val ring: RelayRingSettings? = null,
 )
 
 /** [tone] is the message's category when message tone is on, for history. */
@@ -156,11 +158,13 @@ internal data class RelayRuleConfig(
     val selectedPackages: Set<String> get() = apps.filterValues { it.enabled }.keys
 
     /**
-     * How this app's calls repeat. A cadence of its own is how one app is told
-     * from another by feel alone, without looking at the phone.
+     * How these calls repeat, most specific first. A caller's own cadence
+     * outranks the app's for the same reason their vibration does: it is the
+     * more specific rule, and a cadence is how one of them is told from
+     * another by feel alone, without looking at the phone.
      */
-    fun ringFor(packageName: String): RelayRingSettings =
-        apps[packageName]?.ring ?: ring
+    fun ringFor(packageName: String, callerId: String? = null): RelayRingSettings =
+        callerId?.let { callers[it]?.ring } ?: apps[packageName]?.ring ?: ring
 
     fun match(
         packageName: String,
