@@ -83,40 +83,6 @@ class _RulesPanelState extends State<RulesPanel> {
             ),
           ),
         if (!state.batteryExempt) const SizedBox(height: 12),
-        ConversationPicker(controller: state, perform: widget.perform),
-        const SizedBox(height: 12),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          key: const ValueKey('default-vibration'),
-          leading: const Icon(Icons.vibration),
-          title: const Text('Default vibration'),
-          subtitle: Text(state.settings.defaultPreset.label),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => editVibration(
-            context,
-            state,
-            title: 'Default vibration',
-            initial: state.settings.defaultPreset,
-            onSave: (preset) => state.saveDefaultPreset(preset!),
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (_repeatsAnyCall(state.settings)) ...[
-          const SizedBox(height: 12),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            key: const ValueKey('ring-timing'),
-            leading: const Icon(Icons.timer_outlined),
-            title: const Text('Repeat timing'),
-            subtitle: Text(
-              'A pulse every ${state.settings.ringGapMillis} ms · '
-              'stops after ${state.settings.ringMaxSeconds} s',
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => editRingTiming(context, state, widget.perform),
-          ),
-        ],
-        const SizedBox(height: 12),
         ListTile(
           contentPadding: EdgeInsets.zero,
           key: const ValueKey('caller-rules'),
@@ -136,6 +102,25 @@ class _RulesPanelState extends State<RulesPanel> {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        ConversationPicker(controller: state, perform: widget.perform),
+        const SizedBox(height: 12),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          key: const ValueKey('default-vibration'),
+          leading: const Icon(Icons.vibration),
+          title: const Text('Default vibration'),
+          subtitle: Text(state.settings.defaultPreset.label),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => editVibration(
+            context,
+            state,
+            title: 'Default vibration',
+            initial: state.settings.defaultPreset,
+            onSave: (preset) => state.saveDefaultPreset(preset!),
+          ),
+        ),
+        const SizedBox(height: 12),
         const SizedBox(height: 12),
         ListTile(
           contentPadding: EdgeInsets.zero,
@@ -534,99 +519,6 @@ Future<void> editQuietHours(
           ),
         ],
       ),
-    ),
-  );
-}
-
-/// Repeat timing only matters when something is actually set to repeat.
-bool _repeatsAnyCall(RelaySettings settings) =>
-    settings.defaultCallPreset.pattern == VibrationPattern.ring ||
-    settings.apps.values.any(
-      (rule) => rule.enabled && rule.callPreset?.pattern == VibrationPattern.ring,
-    );
-
-Future<void> editRingTiming(
-  BuildContext context,
-  DemoController state,
-  void Function(Future<void> Function()) perform,
-) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  builder: (context) => _RingTimingEditor(state: state, perform: perform),
-);
-
-class _RingTimingEditor extends StatefulWidget {
-  const _RingTimingEditor({required this.state, required this.perform});
-  final DemoController state;
-  final void Function(Future<void> Function()) perform;
-  @override
-  State<_RingTimingEditor> createState() => _RingTimingEditorState();
-}
-
-class _RingTimingEditorState extends State<_RingTimingEditor> {
-  late double gap = widget.state.settings.ringGapMillis.toDouble();
-  late double maximum = widget.state.settings.ringMaxSeconds.toDouble();
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(
-      24,
-      24,
-      24,
-      MediaQuery.viewInsetsOf(context).bottom + 24,
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Repeat timing',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'A ring holds one connection open and pulses inside it. The Air '
-          'plays one pulse per change it notices, so too short a gap merges '
-          'buzzes into fewer, longer ones. While it rings, Google Health '
-          'cannot sync.',
-        ),
-        const SizedBox(height: 16),
-        Text('A pulse every ${gap.round()} ms'),
-        Slider(
-          key: const ValueKey('ring-gap'),
-          min: 250,
-          max: 2000,
-          divisions: 35,
-          value: gap,
-          label: '${gap.round()} ms',
-          onChanged: (value) => setState(() => gap = value),
-        ),
-        Text('Give up after ${maximum.round()} seconds'),
-        Slider(
-          key: const ValueKey('ring-maximum'),
-          min: 10,
-          max: 180,
-          divisions: 34,
-          value: maximum,
-          label: '${maximum.round()} s',
-          onChanged: (value) => setState(() => maximum = value),
-        ),
-        const SizedBox(height: 16),
-        FilledButton(
-          key: const ValueKey('save-ring-timing'),
-          onPressed: () {
-            widget.perform(
-              () => widget.state.saveRingSettings(
-                gap.round(),
-                maximum.round(),
-              ),
-            );
-            Navigator.pop(context);
-          },
-          child: const Text('Save'),
-        ),
-      ],
     ),
   );
 }
