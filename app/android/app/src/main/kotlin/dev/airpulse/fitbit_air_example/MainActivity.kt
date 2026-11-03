@@ -145,10 +145,13 @@ class MainActivity : FlutterActivity() {
                                 val existing = config.callers[id]
                                 require(existing != null || label != null) { "Unknown caller" }
                                 config.copy(callers = config.callers + (id to SavedCaller(
-                                    // A caller belongs to the app they call
-                                    // through, which is what scopes the list
-                                    // they appear in.
-                                    existing?.packageName ?: forApp ?: RelayRuleStore.DIALER,
+                                    // The list being edited from says which
+                                    // app this rule is for, and outranks what
+                                    // the record already holds: a caller
+                                    // stored under the wrong app would
+                                    // otherwise keep it however often it was
+                                    // saved again.
+                                    forApp ?: existing?.packageName ?: RelayRuleStore.DIALER,
                                     label ?: existing!!.label, preset,
                                     detail ?: existing?.detail,
                                     // Keep their cadence; this call is about
@@ -167,11 +170,12 @@ class MainActivity : FlutterActivity() {
                                 // Pacing someone can come before giving them a
                                 // vibration, so this creates the caller when
                                 // the list supplied a name for them.
-                                val caller = config.callers[id] ?: SavedCaller(
-                                    call.argument<String>("packageName") ?: RelayRuleStore.DIALER,
+                                val forApp = call.argument<String>("packageName")
+                                val caller = (config.callers[id] ?: SavedCaller(
+                                    forApp ?: RelayRuleStore.DIALER,
                                     requireNotNull(label) { "Unknown caller" },
                                     detail = detail,
-                                )
+                                )).let { if (forApp == null) it else it.copy(packageName = forApp) }
                                 config.copy(callers = config.callers + (id to caller.copy(
                                     ring = if (gap == null || max == null) null
                                     else RelayRingSettings(gap, max),

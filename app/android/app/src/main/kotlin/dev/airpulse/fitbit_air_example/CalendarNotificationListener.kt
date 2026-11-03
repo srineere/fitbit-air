@@ -53,7 +53,10 @@ class CalendarNotificationListener : NotificationListenerService() {
         if (kind == RelayAlertKind.CALL) RelayAppSelection.rememberCalling(this, sbn.packageName)
         val caller = if (kind == RelayAlertKind.CALL) {
             RelayCallerIdentity.of(this, sbn.packageName, sbn.notification)
-                ?.also { RelayRecentCallers.remember(it) }
+                ?.also {
+                    RelayRecentCallers.remember(it)
+                    RelayAppSelection.rememberNamesCallers(this, sbn.packageName)
+                }
         } else null
         relay.onAlert(
             sbn.packageName, sbn.key, sbn.postTime, sbn.isOngoing,

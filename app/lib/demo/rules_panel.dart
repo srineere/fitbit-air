@@ -182,6 +182,9 @@ class _RulesPanelState extends State<RulesPanel> {
               // Calendar and Messages never ring, so they are not offered a
               // call rule; one already set stays visible so it can be undone.
               final canCall = app['calls'] == 'true' || callPreset != null;
+              // Only apps known to say who is calling get a list of people;
+              // elsewhere it would never match anything.
+              final namesCallers = app['people'] == 'true';
               final icon = app['icon'] as String?;
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -239,7 +242,7 @@ class _RulesPanelState extends State<RulesPanel> {
                             state.saveAppRule(pkg, enabled, value, callPreset),
                       ),
                     ),
-                    if (canCall)
+                    if (canCall && namesCallers)
                       _alertRow(
                         key: ValueKey('app-people-$pkg'),
                         icon: Icons.person_outline,

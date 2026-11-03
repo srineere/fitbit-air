@@ -11,6 +11,7 @@ import java.io.ByteArrayOutputStream
 /** Host-app preferences, deliberately separate from the device-control package. */
 internal object RelayAppSelection {
     private const val DEFAULT_APP = "com.google.android.calendar"
+    private const val DEFAULT_DIALER = "com.google.android.dialer"
 
     fun selected(context: Context): Set<String> = context
         .getSharedPreferences("calendar_relay", Context.MODE_PRIVATE)
@@ -53,6 +54,25 @@ internal object RelayAppSelection {
     }.getOrDefault(false)
 
     /**
+     * Apps known to say who is calling, so only they are offered a list of
+     * people. An app that rings without naming the caller would give a list
+     * that never matches anything, which is worse than not offering one.
+     */
+    private val namesCallers = setOf(DEFAULT_DIALER, "com.whatsapp", "com.whatsapp.w4b")
+
+    /** An app that has actually named a caller has earned its list. */
+    fun rememberNamesCallers(context: Context, packageName: String) {
+        val prefs = context.getSharedPreferences("calendar_relay", Context.MODE_PRIVATE)
+        val seen = prefs.getStringSet("naming_apps", emptySet())!!
+        if (packageName in seen || seen.size >= 64) return
+        prefs.edit().putStringSet("naming_apps", seen + packageName).apply()
+    }
+
+    private fun seenNaming(context: Context): Set<String> = context
+        .getSharedPreferences("calendar_relay", Context.MODE_PRIVATE)
+        .getStringSet("naming_apps", emptySet())!!
+
+    /**
      * Apps actually seen ringing, in case one calls without declaring it.
      * Observation beats inference: an app that has rung is a calling app
      * whatever its manifest says.
@@ -81,11 +101,13 @@ internal object RelayAppSelection {
         for (name in selected(context)) apps.putIfAbsent(name,
             if (name == DEFAULT_APP) "Google Calendar" else name)
         val rang = seenCalling(context)
+        val named = seenNaming(context)
         return apps.entries.sortedBy { it.value.lowercase() }.map { app ->
             val entry = mutableMapOf(
                 "packageName" to app.key,
                 "label" to app.value,
                 "calls" to (app.key in rang || canReceiveCalls(context, app.key)).toString(),
+                "people" to (app.key in namesCallers || app.key in named).toString(),
             )
             runCatching {
                 val icon = manager.getApplicationIcon(app.key)
