@@ -18,16 +18,20 @@ internal object AirReadOnlyResources {
      * the light do anything; what it can show is whether such a resource
      * exists to be written to later.
      */
-    private val paths = listOf(
+    private val paths: List<String> = buildList {
         // Known from the decompiled stack.
-        "/md/606", "liveactivity", "/alarms", "/sync/status",
-        // Device metadata neighbours of the battery resource.
-        "/md/600", "/md/601", "/md/602", "/md/603", "/md/604",
-        "/md/605", "/md/607", "/md/608", "/md/609", "/md/610",
-        // Names a status light might plausibly live under.
-        "/led", "/leds", "/light", "/display", "/screen", "/ui",
-        "/device", "/status", "/settings", "/notification", "/notifications",
-    )
+        addAll(listOf("/md/606", "liveactivity", "/alarms", "/sync/status", "/sync/response"))
+        // The metadata namespace the battery resource lives in. Only 606 is
+        // known, and a handful of neighbours proved nothing either way, so
+        // the whole block is swept.
+        for (id in 600..699) add("/md/$id")
+        // Names a status light or a notification surface might live under.
+        addAll(listOf(
+            "/led", "/leds", "/light", "/display", "/screen", "/ui",
+            "/device", "/status", "/settings", "/notification", "/notifications",
+            "/time", "/battery", "/firmware", "/features", "/config", "/prefs",
+        ))
+    }
 
     fun probe(endpoint: CoapEndpoint): Single<Map<String, Any>> =
         Observable.fromIterable(paths).concatMapSingle { path ->
@@ -42,10 +46,15 @@ internal object AirReadOnlyResources {
                         "bodyLength" to body.size,
                     ).also {
                         // Shape only: a response class and a length, never a
-                        // payload, which could hold device identifiers.
-                        android.util.Log.i("AirBridge", "probe $path -> " +
-                            "${response.responseCode.responseClass}.${response.responseCode.detail}" +
-                            " bytes=${body.size}")
+                        // payload, which could hold device identifiers. A
+                        // not-found is the expected answer and is not logged,
+                        // so that what does answer stands out.
+                        if (response.responseCode.responseClass.toInt() != 4 ||
+                            response.responseCode.detail.toInt() != 4) {
+                            android.util.Log.i("AirBridge", "probe $path -> " +
+                                "${response.responseCode.responseClass}.${response.responseCode.detail}" +
+                                " bytes=${body.size}")
+                        }
                     }
                 }
             }.timeout(5, TimeUnit.SECONDS).onErrorReturn {
@@ -53,5 +62,9 @@ internal object AirReadOnlyResources {
                 android.util.Log.i("AirBridge", "probe $path -> no answer")
                 mapOf("path" to path, "errorCode" to "RESOURCE_READ_FAILED")
             }
-        }.toList().map { results -> mapOf("resources" to results) }
+        }.toList().map { results ->
+            val found = results.count { (it["responseClass"] as? Int) == 2 }
+            android.util.Log.i("AirBridge", "resource sweep: ${results.size} paths, $found readable")
+            mapOf("resources" to results)
+        }
 }

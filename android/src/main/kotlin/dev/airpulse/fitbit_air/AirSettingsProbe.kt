@@ -26,7 +26,12 @@ import java.util.concurrent.TimeUnit
  * side effect on the device.
  */
 internal object AirSettingsProbe {
-    private val selectors = (2..12).toList()
+    /**
+     * Every selector that fits the one byte this message carries, minus
+     * haptics. A protobuf field number is not capped at a handful, so a short
+     * sweep would have proved only that the first few are empty.
+     */
+    private val selectors = (2..127).toList()
 
     /** Enough to see a setting's shape; a settings value is not an identifier. */
     private const val MAX_LOGGED_BYTES = 32
@@ -42,7 +47,11 @@ internal object AirSettingsProbe {
                     val code = "${response.responseCode.responseClass}.${response.responseCode.detail}"
                     val hex = body.take(MAX_LOGGED_BYTES)
                         .joinToString(" ") { "%02x".format(it.toInt() and 255) }
-                    Log.i("AirBridge", "setting $selector -> $code bytes=${body.size} [$hex]")
+                    // A rejected selector is the expected answer; logging 126
+                    // of them would bury the one that is not.
+                    if (response.responseCode.responseClass.toInt() != 4) {
+                        Log.i("AirBridge", "setting $selector -> $code bytes=${body.size} [$hex]")
+                    }
                     mapOf<String, Any>(
                         "selector" to selector,
                         "responseClass" to response.responseCode.responseClass.toInt(),
@@ -55,7 +64,11 @@ internal object AirSettingsProbe {
                 Log.i("AirBridge", "setting $selector -> no answer")
                 mapOf("selector" to selector, "errorCode" to "SETTING_READ_FAILED")
             }
-        }.toList().map { results -> mapOf("settings" to results) }
+        }.toList().map { results ->
+            val answered = results.count { (it["responseClass"] as? Int) == 2 }
+            Log.i("AirBridge", "settings sweep: ${results.size} selectors, $answered answered")
+            mapOf("settings" to results)
+        }
 
     /** `Settings { <selector> { 1: value } }`, the shape haptics is written in. */
     private fun body(selector: Int, value: Int) = byteArrayOf(

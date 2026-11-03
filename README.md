@@ -124,9 +124,15 @@ being written off. Three findings, from this phone:
   names are absent from the routing table, not hidden from us.
 - **The device has exactly two settings.** `/settings` refuses `GET` with
   `4.05`, so it was enumerated with the selector-only message the haptic read
-  already uses. Selector 1 is haptics; selector 2 answers
-  `0a 04 12 02 08 00`, the same shape one field across; selectors 3–12 are
-  rejected with `4.00`.
+  already uses. Of the 126 selectors that fit that message's single byte, one
+  answered: selector 2, replying `0a 04 12 02 08 00`, the same shape as
+  haptics one field across. Selectors beyond 127 need a two-byte varint and
+  were not swept.
+- **Two other resources exist and are not lights.** `/sync/response` refuses
+  `GET` with `4.05`, so it is write-only like `/settings`; it carries the sync
+  protocol and is deliberately left alone, since probing it means sending
+  messages of unknown shape into the mechanism that moves activity and sleep
+  data. `/time` answers `4.01`. In `/md/600`–`/md/699`, only `606` exists.
 - **Setting 2 does nothing visible.** Written to 1, held two seconds, and
   restored — twice, verified each time. No light, no vibration. Unlike
   haptics, whose whole usefulness is that *changing* it makes the Air buzz,
