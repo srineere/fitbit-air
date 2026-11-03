@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:fitbit_air/fitbit_air.dart';
 import 'package:air_bridge/demo/demo_controller.dart';
@@ -87,7 +86,7 @@ void main() {
   );
 
   test(
-    'bounded reports separate manual observations and omit raw payload fields',
+    'reports omit raw payload fields and device identifiers',
     () async {
       controller.actions['trial'] = DemoAction(() {}, streaming: true);
       await controller.runAction('trial');
@@ -101,11 +100,6 @@ void main() {
       expect(controller.trials.single['observations'] as List, hasLength(100));
       controller.finishOperation('cancelled');
       controller.mark('felt_vibration');
-      final report = jsonDecode(controller.exportJson()) as Map;
-      expect(
-        (report['manualObservations'] as List).single['kind'],
-        'manual_marker',
-      );
       expect(controller.exportJson(), isNot(contains('secret')));
       expect(controller.exportJson(), isNot(contains('private-id')));
       expect(controller.trials.single['outcome'], 'cancelled');

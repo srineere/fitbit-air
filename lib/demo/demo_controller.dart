@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:fitbit_air/fitbit_air.dart';
-import 'package:fitbit_air/fitbit_air_diagnostics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -28,9 +27,7 @@ class DemoController extends ChangeNotifier {
   static const channel = MethodChannel('air_bridge/calendar');
   final actions = <String, DemoAction>{};
   Future<void> Function()? cancelCurrent;
-  Map<String, Object?> transportDiagnostics = {};
   RelaySettings settings = const RelaySettings();
-  AirWristPresenceEvent? lastWristObservation;
   AirBattery? battery;
   DateTime? batteryReadAt;
   bool batteryReading = false;
@@ -436,7 +433,6 @@ class DemoController extends ChangeNotifier {
 
   /// Chats found in WhatsApp notifications while finding chats; saved ones are in [settings].
   List<SavedChat> conversationCandidates = [];
-  int secureDurationSeconds = 30;
   Timer? _poll;
   bool _disposed = false;
   Future<void>? _refreshInFlight;
@@ -505,19 +501,6 @@ class DemoController extends ChangeNotifier {
     } catch (_) {
       // Unknown firmware only hides the compatibility notice.
     }
-    try {
-      final settings = await channel.invokeMapMethod<String, Object?>(
-        'labSettings',
-      );
-      final duration = settings?['secureDurationSeconds'];
-      if (duration is int && [30, 60, 90].contains(duration)) {
-        secureDurationSeconds = duration;
-      }
-    } on PlatformException catch (error) {
-      setupError = recoveryHint(error.code);
-    } on MissingPluginException {
-      // The status explains that this app needs Android.
-    }
     initialized = true;
     _scheduleBatteryUpdate();
     _changed();
@@ -579,14 +562,6 @@ class DemoController extends ChangeNotifier {
   }
 
   Future<void> _readStatus() async {
-    try {
-      transportDiagnostics =
-          await FitbitAirDiagnostics.readTransportDiagnostics();
-    } on PlatformException {
-      transportDiagnostics = {'available': false};
-    } on MissingPluginException {
-      transportDiagnostics = {'available': false};
-    }
     try {
       final state = await channel.invokeMapMethod<String, Object?>('status', {
         'callersFor': callersFor,
@@ -926,10 +901,6 @@ class DemoController extends ChangeNotifier {
     }
   }
 
-  void recordWristObservation(AirWristPresenceEvent observation) {
-    lastWristObservation = observation;
-    _changed();
-  }
 
   Future<void> _relayCall(String method, [Object? arguments]) async {
     changingRelay = true;
@@ -1081,15 +1052,6 @@ class DemoController extends ChangeNotifier {
       channel.invokeMethod<void>('bluetoothSettings');
   Future<void> clearHistory() => _relayCall('clearHistory');
 
-  Future<void> saveDuration(int seconds) async {
-    if (busy) throw StateError('Finish the active trial first.');
-    if (![30, 60, 90].contains(seconds)) throw ArgumentError.value(seconds);
-    await channel.invokeMethod<void>('setLabSettings', {
-      'secureDurationSeconds': seconds,
-    });
-    secureDurationSeconds = seconds;
-    _changed();
-  }
 
   /// Same named operations for buttons and device integration tests.
   Future<void> runAction(String id) async {
@@ -1239,7 +1201,6 @@ class DemoController extends ChangeNotifier {
       'savedChatCount': settings.chats.length,
       'captureDiagnostics': captureDiagnostics,
     },
-    'transport': transportDiagnostics,
     'settings': {
       'defaultPreset': settings.defaultPreset.id,
       'appRuleCount': settings.apps.length,
@@ -1247,8 +1208,6 @@ class DemoController extends ChangeNotifier {
       'silenceReason': settings.silenceReason,
       'quietEnabled': settings.quietEnabled,
     },
-    'trials': _trials,
-    'manualObservations': _observations,
   };
   String exportJson() => const JsonEncoder.withIndent('  ').convert(report());
 

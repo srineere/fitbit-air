@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:fitbit_air/fitbit_air_diagnostics.dart';
 import 'package:air_bridge/demo/demo_controller.dart';
 import 'package:air_bridge/demo/relay_settings.dart';
 import 'package:flutter/services.dart';
@@ -111,20 +110,4 @@ void main() {
       expect(completed, isTrue);
       expect(controller.previewing, isFalse);
     },
-  );
-  test('wrist observations stay historical and do not change relay rules', () {
-    final controller = DemoController();
-    addTearDown(controller.dispose);
-    expect(controller.lastWristObservation, isNull);
-    final event = AirSecureEvent.fromMap({
-      'kind': 'device_event',
-      'path': 'events',
-      'receivedAtMillis': 1000,
-      'eventIds': [2003989293],
-    });
-    controller.recordWristObservation(event.wristPresenceEvents.single);
-    expect(controller.lastWristObservation?.state, AirWristPresence.offWrist);
-    expect(controller.settings.silenceReason, isNull);
-    expect(controller.selectedApps, {'com.google.android.calendar'});
-  });
-}
+  );}
