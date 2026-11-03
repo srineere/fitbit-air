@@ -252,7 +252,7 @@ class FitbitAir {
       if (intensity != null) 'intensity': intensity.wireValue,
       'gapMillis': gap.inMilliseconds,
       'maxMillis': maximum.inMilliseconds,
-      if (pulses != null) 'pulses': pulses,
+      'pulses': ?pulses,
     }),
   );
 
