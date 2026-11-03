@@ -150,8 +150,17 @@ class MainActivity : FlutterActivity() {
                             val id = requireNotNull(call.argument<String>("id"))
                             val gap = call.argument<Int>("gapMillis")
                             val max = call.argument<Int>("maxSeconds")
+                            val label = call.argument<String>("label")
+                            val detail = call.argument<String>("detail")
                             RelayRuleStore.update(this) { config ->
-                                val caller = requireNotNull(config.callers[id]) { "Unknown caller" }
+                                // Pacing someone can come before giving them a
+                                // vibration, so this creates the caller when
+                                // the list supplied a name for them.
+                                val caller = config.callers[id] ?: SavedCaller(
+                                    "com.google.android.dialer",
+                                    requireNotNull(label) { "Unknown caller" },
+                                    detail = detail,
+                                )
                                 config.copy(callers = config.callers + (id to caller.copy(
                                     ring = if (gap == null || max == null) null
                                     else RelayRingSettings(gap, max),

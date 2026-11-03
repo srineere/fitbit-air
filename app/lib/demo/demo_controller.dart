@@ -776,11 +776,15 @@ class DemoController extends ChangeNotifier {
   Future<void> saveCallerRingSettings(
     String id,
     int gapMillis,
-    int maxSeconds,
-  ) => _relayCall('saveCallerRingSettings', {
+    int maxSeconds, {
+    String? label,
+    String? detail,
+  }) => _relayCall('saveCallerRingSettings', {
     'id': id,
     'gapMillis': gapMillis,
     'maxSeconds': maxSeconds,
+    'label': ?label,
+    'detail': ?detail,
   });
 
   Future<void> removeCaller(String id) => _relayCall('removeCaller', {'id': id});
