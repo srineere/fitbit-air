@@ -327,6 +327,19 @@ class RelayCallRulesTest {
         assertEquals(appPace, plain.ringFor(dialer, "alice"))
     }
 
+    @Test fun `a caller belongs to the app they call through`() {
+        // Names are hashed with the app that reported them, so the same
+        // person on WhatsApp and on the phone are two callers with two rules.
+        val viaApp = RelayCallerIdentity.identityOf("com.whatsapp", "Alice")
+        val viaDialer = RelayCallerIdentity.identityOf(dialer, "Alice")
+        assertNotEquals(viaApp, viaDialer)
+        // A number is the same person whichever app carried the call.
+        assertEquals(
+            RelayCallerIdentity.identityOf("com.whatsapp", "+91 98765 43210"),
+            RelayCallerIdentity.identityOf(dialer, "tel:+919876543210"),
+        )
+    }
+
     @Test fun `only calls may repeat`() {
         assertTrue(RelayPreset.RING.callsOnly)
         assertFalse(RelayPreset.DOUBLE.callsOnly)

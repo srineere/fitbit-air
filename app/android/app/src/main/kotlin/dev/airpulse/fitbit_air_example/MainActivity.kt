@@ -140,13 +140,20 @@ class MainActivity : FlutterActivity() {
                             val label = call.argument<String>("label")
                             val detail = call.argument<String>("detail")
                             val preset = call.argument<String>("preset")?.let { RelayPreset.parse(it) }
+                            val forApp = call.argument<String>("packageName")
                             RelayRuleStore.update(this) { config ->
                                 val existing = config.callers[id]
                                 require(existing != null || label != null) { "Unknown caller" }
                                 config.copy(callers = config.callers + (id to SavedCaller(
-                                    existing?.packageName ?: "com.google.android.dialer",
+                                    // A caller belongs to the app they call
+                                    // through, which is what scopes the list
+                                    // they appear in.
+                                    existing?.packageName ?: forApp ?: RelayRuleStore.DIALER,
                                     label ?: existing!!.label, preset,
-                                    detail ?: existing?.detail)))
+                                    detail ?: existing?.detail,
+                                    // Keep their cadence; this call is about
+                                    // the vibration, not the pacing.
+                                    existing?.ring)))
                             }
                             result.success(null)
                         }
