@@ -15,10 +15,16 @@ class CallerRulesPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.perform,
+    this.packageName = 'com.google.android.dialer',
+    this.title = 'Callers',
   });
 
   final DemoController controller;
   final void Function(Future<void> Function()) perform;
+
+  /// Whose people these are. Callers belong to the app they call through.
+  final String packageName;
+  final String title;
 
   @override
   State<CallerRulesPage> createState() => _CallerRulesPageState();
@@ -50,7 +56,7 @@ class _CallerRulesPageState extends State<CallerRulesPage> {
   void initState() {
     super.initState();
     widget.controller.addListener(_refresh);
-    widget.perform(widget.controller.loadContacts);
+    widget.perform(() => widget.controller.viewCallersFor(widget.packageName));
   }
 
   void _refresh() {
@@ -155,7 +161,7 @@ class _CallerRulesPageState extends State<CallerRulesPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Callers'),
+        title: Text(widget.title),
         actions: [
           IconButton(
             key: const ValueKey('resync-contacts'),
@@ -233,9 +239,12 @@ class _CallerRulesPageState extends State<CallerRulesPage> {
                   key: const ValueKey('grant-contacts'),
                   leading: const Icon(Icons.contacts_outlined),
                   title: const Text('Show my contacts'),
-                  subtitle: const Text(
-                    'Lets you set a rule before someone calls. Names are read '
-                    'to show this list; numbers are hashed and never stored.',
+                  subtitle: Text(
+                    widget.packageName == 'com.google.android.dialer'
+                        ? 'Lets you set a rule before someone calls. Names are '
+                              'read to show this list; numbers are hashed.'
+                        : 'This app names its callers, so contacts are matched '
+                              'by name. Renaming a contact breaks their rule.',
                   ),
                   isThreeLine: true,
                   onTap: () => widget.perform(() async {

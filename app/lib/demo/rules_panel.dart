@@ -240,8 +240,25 @@ class _RulesPanelState extends State<RulesPanel> {
                       ),
                     ),
                     if (canCall)
-                        _alertRow(
-                          key: ValueKey('app-calls-$pkg'),
+                      _alertRow(
+                        key: ValueKey('app-people-$pkg'),
+                        icon: Icons.person_outline,
+                        title: 'People',
+                        value: 'Rules for individual callers',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => CallerRulesPage(
+                              controller: state,
+                              perform: widget.perform,
+                              packageName: pkg,
+                              title: '$label callers',
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (canCall)
+                      _alertRow(
+                        key: ValueKey('app-calls-$pkg'),
                         icon: Icons.call_outlined,
                         title: 'Calls',
                         value:

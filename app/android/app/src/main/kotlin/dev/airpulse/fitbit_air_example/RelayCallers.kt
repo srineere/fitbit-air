@@ -3,6 +3,7 @@ package dev.airpulse.fitbit_air_example
 import android.app.Notification
 import android.app.Person
 import android.os.Build
+import android.util.Log
 import java.security.MessageDigest
 
 /**
@@ -25,7 +26,12 @@ internal object RelayCallerIdentity {
         .digest(value.toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it.toInt() and 255) }
 
-    data class Caller(val id: String, val label: String, val detail: String?)
+    data class Caller(
+        val id: String,
+        val label: String,
+        val detail: String?,
+        val packageName: String,
+    )
 
     /**
      * The dialable digits in a handle, or null when it is not a number.
@@ -90,11 +96,21 @@ internal object RelayCallerIdentity {
         // against, and the URI stands in as an identity of its own.
         val number = uri?.let { RelayContacts.numberFor(context, it) }
         val handle = number ?: uri ?: person?.key?.takeIf { it.isNotBlank() } ?: name ?: return null
+        // Structure only, never a name or a number: enough to see whether an
+        // app says who is calling, and in what form.
+        Log.i("AirBridge", "caller shape pkg=$packageName" +
+            " person=${person != null}" +
+            " uriScheme=${uri?.substringBefore(':')}" +
+            " key=${person?.key != null}" +
+            " name=${name != null}" +
+            " resolvedNumber=${number != null}" +
+            " dialable=${dialable(handle) != null}")
         return Caller(
             id = identityOf(packageName, handle) ?: return null,
             label = name ?: "Unknown caller",
             // Only a number is worth showing; an opaque handle is noise.
             detail = number,
+            packageName = packageName,
         )
     }
 }
@@ -117,11 +133,12 @@ internal object RelayRecentCallers {
         while (recent.size > LIMIT) recent.remove(recent.keys.first())
     }
 
-    /** Newest first, excluding callers that already have a rule. */
+    /** Newest first for one app, excluding callers that already have a rule. */
     @Synchronized
-    fun list(saved: Set<String>): List<Map<String, String>> = recent.entries
+    fun list(saved: Set<String>, packageName: String): List<Map<String, String>> = recent.entries
         .reversed()
         .filterNot { it.key in saved }
+        .filter { it.value.packageName == packageName }
         .map {
             mapOf("id" to it.key, "label" to it.value.label, "detail" to (it.value.detail ?: ""))
         }

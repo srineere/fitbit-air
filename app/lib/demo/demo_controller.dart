@@ -588,7 +588,9 @@ class DemoController extends ChangeNotifier {
       transportDiagnostics = {'available': false};
     }
     try {
-      final state = await channel.invokeMapMethod<String, Object?>('status');
+      final state = await channel.invokeMapMethod<String, Object?>('status', {
+        'callersFor': callersFor,
+      });
       if (state == null || _disposed) return;
       setupCompleted = state['setupCompleted'] == true;
       setupStep = (state['setupStep'] as int? ?? 0).clamp(0, 3);
@@ -745,8 +747,23 @@ class DemoController extends ChangeNotifier {
   List<SavedCaller> contacts = const [];
   bool contactsGranted = false;
 
+  /// Whose people are being looked at. Callers belong to the app they call
+  /// through, because an app that names callers cannot share identities with
+  /// one that numbers them.
+  String callersFor = 'com.google.android.dialer';
+
+  Future<void> viewCallersFor(String packageName) async {
+    callersFor = packageName;
+    contacts = const [];
+    _changed();
+    await refresh(force: true);
+    await loadContacts();
+  }
+
   Future<void> loadContacts() async {
-    final result = await channel.invokeMapMethod<String, Object?>('contacts');
+    final result = await channel.invokeMapMethod<String, Object?>('contacts', {
+      'packageName': callersFor,
+    });
     contactsGranted = result?['granted'] == true;
     contacts = [
       for (final caller in result?['contacts'] as List? ?? const [])
@@ -770,6 +787,7 @@ class DemoController extends ChangeNotifier {
     'preset': preset?.id,
     'label': ?label,
     'detail': ?detail,
+    'packageName': callersFor,
   });
 
   /// One caller's own ring cadence, outranking the app's.
@@ -785,9 +803,11 @@ class DemoController extends ChangeNotifier {
     'maxSeconds': maxSeconds,
     'label': ?label,
     'detail': ?detail,
+    'packageName': callersFor,
   });
 
-  Future<void> removeCaller(String id) => _relayCall('removeCaller', {'id': id});
+  Future<void> removeCaller(String id) =>
+      _relayCall('removeCaller', {'id': id});
 
   /// Only saved callers ring; everyone else stays silent.
   Future<void> setOnlySavedCallers(bool only) =>
@@ -814,11 +834,10 @@ class DemoController extends ChangeNotifier {
   });
 
   /// How fast a ringing call pulses, and when it gives up.
-  Future<void> saveRingSettings(int gapMillis, int maxSeconds) =>
-      _relayCall('saveRingSettings', {
-        'gapMillis': gapMillis,
-        'maxSeconds': maxSeconds,
-      });
+  Future<void> saveRingSettings(int gapMillis, int maxSeconds) => _relayCall(
+    'saveRingSettings',
+    {'gapMillis': gapMillis, 'maxSeconds': maxSeconds},
+  );
 
   /// Adds a found chat, or changes a saved chat's vibration. Applies while the relay runs.
   Future<void> saveChat(String id, VibrationPreset? preset) =>

@@ -68,7 +68,10 @@ class MainActivity : FlutterActivity() {
                             edit.apply()
                             result.success(null)
                         }
-                        "status" -> result.success(CalendarRelayService.status(this))
+                        "status" -> result.success(CalendarRelayService.status(
+                            this,
+                            call.argument<String>("callersFor") ?: RelayRuleStore.DIALER,
+                        ))
                         "appSettings" -> {
                             startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName")))
                             result.success(null)
@@ -118,9 +121,10 @@ class MainActivity : FlutterActivity() {
                             result.success(null)
                         }
                         "contacts" -> {
+                            val forApp = call.argument<String>("packageName") ?: RelayRuleStore.DIALER
                             result.success(mapOf(
                                 "granted" to RelayContacts.granted(this),
-                                "contacts" to RelayContacts.list(this),
+                                "contacts" to RelayContacts.list(this, forApp),
                             ))
                         }
                         "requestContacts" -> {
@@ -157,7 +161,7 @@ class MainActivity : FlutterActivity() {
                                 // vibration, so this creates the caller when
                                 // the list supplied a name for them.
                                 val caller = config.callers[id] ?: SavedCaller(
-                                    "com.google.android.dialer",
+                                    call.argument<String>("packageName") ?: RelayRuleStore.DIALER,
                                     requireNotNull(label) { "Unknown caller" },
                                     detail = detail,
                                 )

@@ -741,7 +741,7 @@ class CalendarRelayService : Service() {
         private fun bluetoothPermission(context: Context): Boolean = Build.VERSION.SDK_INT < 31 ||
             context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
 
-        fun status(context: Context): Map<String, Any?> = mapOf(
+        fun status(context: Context, callersFor: String = RelayRuleStore.DIALER): Map<String, Any?> = mapOf(
             "notificationControlsAllowed" to context.getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled(),
             "setupStep" to context.getSharedPreferences("relay_onboarding", MODE_PRIVATE).getInt("step", 0).coerceIn(0, 3),
             "setupCompleted" to context.getSharedPreferences("relay_onboarding", MODE_PRIVATE).getBoolean("completed", false),
@@ -753,7 +753,7 @@ class CalendarRelayService : Service() {
             "ringing" to (active?.ring != null),
             "selectedApps" to RelayRuleStore.read(context).selectedPackages.sorted(),
             "pulseStyle" to RelayRuleStore.read(context).defaultPreset.id,
-            "rules" to RelayRuleStore.status(context),
+            "rules" to RelayRuleStore.status(context, callersFor),
             "conversations" to RelayConversations.status(),
             "history" to RelayHistory.read(context).asReversed().map { it.toMap() },
             "bluetoothPermission" to bluetoothPermission(context),

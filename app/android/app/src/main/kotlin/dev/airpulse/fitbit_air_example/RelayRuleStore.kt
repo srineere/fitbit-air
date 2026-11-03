@@ -5,6 +5,8 @@ import org.json.JSONObject
 
 /** Versioned, app-private settings. Chat identities never enter reports or backups. */
 internal object RelayRuleStore {
+    const val DIALER = "com.google.android.dialer"
+
     private fun prefs(context: Context) = context.getSharedPreferences("relay_rules", Context.MODE_PRIVATE)
 
     @Synchronized fun read(context: Context): RelayRuleConfig {
@@ -147,7 +149,7 @@ internal object RelayRuleStore {
         CalendarRelayService.active?.settingsChanged()
     }
 
-    fun status(context: Context): Map<String, Any?> {
+    fun status(context: Context, callersFor: String = DIALER): Map<String, Any?> {
         val c = read(context)
         return mapOf("defaultPreset" to c.defaultPreset.id,
             "defaultCallPreset" to c.defaultCallPreset.id,
@@ -158,14 +160,17 @@ internal object RelayRuleStore {
                     "ringGapMillis" to r.ring?.gapMillis, "ringMaxSeconds" to r.ring?.maxSeconds)
             },
             "onlySavedCallers" to c.onlySavedCallers,
-            "callers" to c.callers.map { (id, caller) ->
+            "callers" to c.callers.filter { it.value.packageName == callersFor }.map { (id, caller) ->
                 mapOf("id" to id, "packageName" to caller.packageName,
                     "label" to caller.label, "preset" to caller.preset?.id,
                     "detail" to caller.detail,
                     "ringGapMillis" to caller.ring?.gapMillis,
                     "ringMaxSeconds" to caller.ring?.maxSeconds)
             },
-            "recentCallers" to RelayRecentCallers.list(c.callers.keys),
+            // Callers belong to the app they call through, so the list is
+            // scoped to whichever app's people are being looked at.
+            "recentCallers" to RelayRecentCallers.list(c.callers.keys, callersFor),
+            "callersFor" to callersFor,
             "chats" to c.chats.map { (id, chat) ->
                 mapOf("id" to id, "packageName" to chat.packageName, "label" to chat.label, "kind" to chat.kind,
                     "preset" to chat.preset?.id)
