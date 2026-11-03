@@ -305,6 +305,7 @@ class _DemoPageState extends State<DemoPage> with WidgetsBindingObserver {
       'probeBattery': DemoAction(_probeBattery),
       'probeResources': DemoAction(_probeResources),
       'probeSettings': DemoAction(_probeSettings),
+      'toggleSecondSetting': DemoAction(_toggleSecondSetting),
       'headlessHaptic': DemoAction(
         _headlessTest,
         parameters: () => {'delaySeconds': 15},
@@ -665,6 +666,18 @@ class _DemoPageState extends State<DemoPage> with WidgetsBindingObserver {
         return answered.isEmpty
             ? 'No setting besides haptics answered.'
             : 'Settings that answered: ${answered.join(", ")}. See the log for their bytes.';
+      });
+
+  Future<void> _toggleSecondSetting() =>
+      _run('Turning the unknown setting on for two seconds…', () async {
+        final result = await FitbitAirDiagnostics.toggleSecondSetting();
+        final restored = result['verified'] == true;
+        final applied = result['applied'];
+        return restored
+            ? 'Setting 2 went ${result['original']} to $applied and back. '
+                  'Did the Air do anything?'
+            : 'WARNING: setting 2 did not read back as '
+                  '${result['original']}. Run this again to restore it.';
       });
 
   Future<void> _probeResources() =>
@@ -1204,6 +1217,11 @@ class _DemoPageState extends State<DemoPage> with WidgetsBindingObserver {
       'probeSettings',
       'Research: which settings exist (writes a selector)',
       Icons.tune,
+    ),
+    _action(
+      'toggleSecondSetting',
+      'Research: toggle the unknown setting (2s, restores)',
+      Icons.lightbulb_outline,
     ),
     _action(
       'headlessHaptic',

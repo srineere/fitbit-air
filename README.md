@@ -107,9 +107,39 @@ has been off for a while.
   single pulse in the middle of a ring is indistinguishable from the ring.
 - A pulse is verified by reading the setting back. "Completed" means the write
   verified, not that you felt it.
-- The LED cannot be driven at all. It is firmware-owned, shows only
-  white/red battery states, and no control path is exposed. Colour-coding
+- The LED cannot be driven at all; this was tested rather than assumed.
+  See below. Colour-coding
   notifications by LED is not possible on this hardware.
+
+## The status light is not reachable
+
+Driving the LED was the original hope, so it was probed properly before
+being written off. Three findings, from this phone:
+
+- **It has no resource of its own.** `/led`, `/leds`, `/light`, `/display`,
+  `/screen`, `/ui`, `/device`, `/status`, `/notification(s)` and
+  `/md/600`–`/md/610` all answer `4.04`. That is stronger than a plain
+  not-found: resources that exist behind Google Health's authentication
+  answer `4.01`, as `/alarms`, `/sync/status` and `liveactivity` do. So those
+  names are absent from the routing table, not hidden from us.
+- **The device has exactly two settings.** `/settings` refuses `GET` with
+  `4.05`, so it was enumerated with the selector-only message the haptic read
+  already uses. Selector 1 is haptics; selector 2 answers
+  `0a 04 12 02 08 00`, the same shape one field across; selectors 3–12 are
+  rejected with `4.00`.
+- **Setting 2 does nothing visible.** Written to 1, held two seconds, and
+  restored — twice, verified each time. No light, no vibration. Unlike
+  haptics, whose whole usefulness is that *changing* it makes the Air buzz,
+  setting 2 has no side effect to borrow.
+
+So the light is driven by firmware from device state — battery on a
+double-tap, low battery, charging, firmware update — and nothing the phone
+can send reaches it. Colour-coding alerts by LED is not possible on this
+hardware, and neither is a bare flash.
+
+The probes live in `Developer tools` and are bounded: the resource probe only
+reads, the settings probe sends a selector carrying no value, and the toggle
+restores itself even when a step fails.
 
 ## What this fork changed
 

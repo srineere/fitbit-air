@@ -56,4 +56,81 @@ internal object AirSettingsProbe {
                 mapOf("selector" to selector, "errorCode" to "SETTING_READ_FAILED")
             }
         }.toList().map { results -> mapOf("settings" to results) }
+
+    /** `Settings { <selector> { 1: value } }`, the shape haptics is written in. */
+    private fun body(selector: Int, value: Int) = byteArrayOf(
+        0x0a, 0x04, ((selector shl 3) or 2).toByte(), 0x02, 0x08, value.toByte(),
+    )
+
+    private fun read(endpoint: CoapEndpoint, selector: Int): Single<Int> {
+        val request = OutgoingRequestBuilder("/settings", Method.PUT)
+            .expectSuccess(false).forceNonBlockwise(true).maxResendCount(0)
+            .body(byteArrayOf(0x0a, 0x01, selector.toByte()))
+            .build()
+        return endpoint.responseFor(request).timeout(5, TimeUnit.SECONDS)
+            .flatMap { response ->
+                response.body.asData().map { bytes ->
+                    check(response.responseCode.responseClass.toInt() == 2 && bytes.size == 6) {
+                        "Setting $selector did not read back."
+                    }
+                    bytes.last().toInt()
+                }
+            }
+    }
+
+    private fun write(endpoint: CoapEndpoint, selector: Int, value: Int): Single<Boolean> {
+        val request = OutgoingRequestBuilder("/settings", Method.POST)
+            .expectSuccess(false).forceNonBlockwise(true).maxResendCount(0)
+            .body(body(selector, value)).build()
+        return endpoint.responseFor(request).timeout(5, TimeUnit.SECONDS).map { response ->
+            check(response.responseCode.responseClass.toInt() == 2) {
+                "The Air refused setting $selector."
+            }
+            true
+        }
+    }
+
+    /**
+     * Turns setting 2 on, holds it for [HOLD_MILLIS] so any effect can be
+     * seen, and puts it back.
+     *
+     * The setting's meaning is unknown, which is the whole risk: the window is
+     * short and the restore runs even when a step fails, so whatever it
+     * governs is changed for about two seconds. A lost link between the write
+     * and the restore would leave it on; re-running restores it, and Google
+     * Health keeps its own copy of these settings.
+     */
+    fun toggleSecond(endpoint: CoapEndpoint): Single<Map<String, Any>> =
+        read(endpoint, SECOND).flatMap { original ->
+            val next = if (original == 0) 1 else 0
+            Log.i("AirBridge", "setting $SECOND is $original; writing $next")
+            write(endpoint, SECOND, next)
+                .flatMap { read(endpoint, SECOND) }
+                .doOnSuccess { Log.i("AirBridge", "setting $SECOND now $it; holding") }
+                .flatMap { applied -> Single.timer(HOLD_MILLIS, TimeUnit.MILLISECONDS).map { applied } }
+                // Restore whatever happened above, then report.
+                .flatMap { applied ->
+                    write(endpoint, SECOND, original).retry(2)
+                        .flatMap { read(endpoint, SECOND) }
+                        .map { restored -> Triple(original, applied, restored) }
+                }
+                .onErrorResumeNext { failure: Throwable ->
+                    Log.w("AirBridge", "probe failed: ${failure.message}; restoring")
+                    write(endpoint, SECOND, original).retry(2)
+                        .flatMap { read(endpoint, SECOND) }
+                        .map { restored -> Triple(original, -1, restored) }
+                }
+        }.map { (original, applied, restored) ->
+            Log.i("AirBridge", "setting $SECOND restored to $restored (was $original)")
+            mapOf(
+                "selector" to SECOND,
+                "original" to original,
+                "applied" to applied,
+                "restored" to restored,
+                "verified" to (restored == original),
+            )
+        }
+
+    private const val SECOND = 2
+    private const val HOLD_MILLIS = 2_000L
 }
