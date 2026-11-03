@@ -28,19 +28,23 @@ internal object RelayCallerIdentity {
     data class Caller(val id: String, val label: String, val detail: String?)
 
     /**
-     * Compares phone numbers by their last digits, so `+91 98765 43210`,
-     * `098765 43210` and `tel:+919876543210` are one person. Two numbers
-     * sharing their last ten digits in different countries would collide; on a
-     * personal phone that is rarer than one contact written three ways.
+     * The dialable digits in a handle, or null when it is not a number.
+     *
+     * Compared by their last ten digits, so `+91 98765 43210`, `098765 43210`
+     * and `tel:+919876543210` are one person. Two numbers sharing their last
+     * ten digits in different countries would collide; on a personal phone
+     * that is rarer than one contact written three ways.
      */
-    private fun normalize(handle: String): String? {
-        val trimmed = handle.removePrefix("tel:").trim()
+    private fun dialable(handle: String): String? {
+        val core = handle.removePrefix("tel:").trim()
         val decoded = runCatching {
-            java.net.URLDecoder.decode(trimmed, "UTF-8")
-        }.getOrDefault(trimmed)
-        val digits = decoded.filter { it.isDigit() }
-        if (digits.length >= 7) return "tel:" + digits.takeLast(10)
-        return decoded.lowercase().takeIf { it.isNotBlank() }
+            java.net.URLDecoder.decode(core, "UTF-8")
+        }.getOrDefault(core)
+        // A content:// or mailto: handle has digits in it but is not a number,
+        // and must never be mistaken for one.
+        if (!decoded.all { it.isDigit() || it in " +-()." }) return null
+        val digits = decoded.filter(Char::isDigit)
+        return if (digits.length >= 7) digits.takeLast(10) else null
     }
 
     /**
@@ -50,10 +54,10 @@ internal object RelayCallerIdentity {
      * app's own identifier and only means something inside that app.
      */
     fun identityOf(packageName: String, handle: String): String? {
-        if (handle.length > 512) return null
-        val normalized = normalize(handle) ?: return null
-        val seed = if (normalized.startsWith("tel:")) normalized
-        else packageName + SEPARATOR + normalized
+        if (handle.isBlank() || handle.length > 512) return null
+        val number = dialable(handle)
+        val seed = if (number != null) "tel:" + number
+        else packageName + SEPARATOR + handle.lowercase()
         return hash("caller" + SEPARATOR + seed)
     }
 
@@ -72,21 +76,25 @@ internal object RelayCallerIdentity {
      * apps that do not describe the caller. A rule can then only be made for
      * the app as a whole.
      */
-    fun of(packageName: String, notification: Notification): Caller? {
+    fun of(
+        context: android.content.Context,
+        packageName: String,
+        notification: Notification,
+    ): Caller? {
         val person = person(notification)
-        // A URI is the number or account; a key is the app's own stable id.
-        val stable = person?.uri?.takeIf { it.isNotBlank() }
-            ?: person?.key?.takeIf { it.isNotBlank() }
         val name = person?.name?.toString()?.takeIf { it.isNotBlank() }
-        // Without a stable handle a name is better than nothing, but it is a
-        // display name and changes when the contact is renamed.
-        val identity = stable ?: name ?: return null
+        val uri = person?.uri?.takeIf { it.isNotBlank() }
+        // A dialer names the caller with a contacts lookup URI, not a number.
+        // Resolving it is what lets a call and a contact agree on who they
+        // are; without the contacts permission there is nothing to resolve
+        // against, and the URI stands in as an identity of its own.
+        val number = uri?.let { RelayContacts.numberFor(context, it) }
+        val handle = number ?: uri ?: person?.key?.takeIf { it.isNotBlank() } ?: name ?: return null
         return Caller(
-            id = identityOf(packageName, identity) ?: return null,
+            id = identityOf(packageName, handle) ?: return null,
             label = name ?: "Unknown caller",
-            // Only a dialable handle is worth showing; an app's internal key
-            // would be noise.
-            detail = stable?.removePrefix("tel:")?.takeIf { it.any(Char::isDigit) },
+            // Only a number is worth showing; an opaque handle is noise.
+            detail = number,
         )
     }
 }

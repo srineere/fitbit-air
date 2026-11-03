@@ -25,6 +25,27 @@ internal object RelayContacts {
      * distinct number. A contact with two numbers appears twice, because a
      * call only ever arrives on one of them.
      */
+    /**
+     * The phone number behind a contacts lookup URI, which is how a dialer
+     * names the caller. Null without the contacts permission, or when the
+     * handle is not a lookup URI, in which case the caller is identified by
+     * the handle itself and simply will not line up with a contact.
+     */
+    fun numberFor(context: Context, handle: String): String? {
+        if (!handle.startsWith("content://") || !granted(context)) return null
+        return runCatching {
+            val contactId = ContactsContract.Contacts.lookupContact(
+                context.contentResolver, android.net.Uri.parse(handle),
+            )?.lastPathSegment ?: return null
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+                "${ContactsContract.CommonDataKinds.Phone.CONTACT_ID} = ?",
+                arrayOf(contactId), null,
+            )?.use { if (it.moveToFirst()) it.getString(0) else null }
+        }.getOrNull()
+    }
+
     fun list(context: Context, packageName: String = "com.google.android.dialer"):
         List<Map<String, String>> {
         if (!granted(context)) return emptyList()

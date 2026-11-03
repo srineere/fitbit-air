@@ -258,6 +258,40 @@ class RelayCallRulesTest {
         )
     }
 
+    @Test fun `one number written many ways is one caller`() {
+        val id = RelayCallerIdentity.identityOf(dialer, "tel:+919876543210")
+        assertNotNull(id)
+        assertEquals(id, RelayCallerIdentity.identityOf(dialer, "+91 98765 43210"))
+        assertEquals(id, RelayCallerIdentity.identityOf(dialer, "098765 43210"))
+        assertEquals(id, RelayCallerIdentity.identityOf(dialer, "(098765) 43210"))
+        // The app is left out, so the same person through another app matches.
+        assertEquals(id, RelayCallerIdentity.identityOf("com.whatsapp", "tel:+919876543210"))
+        assertNotEquals(id, RelayCallerIdentity.identityOf(dialer, "tel:+919876543211"))
+    }
+
+    @Test fun `a lookup URI is never mistaken for a phone number`() {
+        // The regression: a dialer names the caller with a contacts lookup
+        // URI, whose digits are not a number. Hashing it as one made the same
+        // person two callers, one from the call and one from contacts.
+        val lookup = "content://com.android.contacts/contacts/lookup/2059i123456789/1234"
+        val id = RelayCallerIdentity.identityOf(dialer, lookup)
+        assertNotNull(id)
+        assertNotEquals(RelayCallerIdentity.identityOf(dialer, "tel:1234567891234"), id)
+        // An opaque handle is scoped to the app that issued it.
+        assertNotEquals(RelayCallerIdentity.identityOf("com.whatsapp", lookup), id)
+    }
+
+    @Test fun `handles that are not numbers at all are still usable`() {
+        assertNotNull(RelayCallerIdentity.identityOf(dialer, "Alice"))
+        assertNull(RelayCallerIdentity.identityOf(dialer, ""))
+        assertNull(RelayCallerIdentity.identityOf(dialer, "x".repeat(513)))
+        // Too few digits to be a number, so not treated as one.
+        assertNotEquals(
+            RelayCallerIdentity.identityOf(dialer, "12345"),
+            RelayCallerIdentity.identityOf("com.whatsapp", "12345"),
+        )
+    }
+
     @Test fun `only calls may repeat`() {
         assertTrue(RelayPreset.RING.callsOnly)
         assertFalse(RelayPreset.DOUBLE.callsOnly)

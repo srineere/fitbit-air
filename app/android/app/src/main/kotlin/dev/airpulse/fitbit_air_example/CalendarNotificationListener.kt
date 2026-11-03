@@ -51,7 +51,7 @@ class CalendarNotificationListener : NotificationListenerService() {
         // Who is calling, when the app says. Hashed; the number never leaves
         // RelayCallerIdentity, and the label stays on this phone.
         val caller = if (kind == RelayAlertKind.CALL) {
-            RelayCallerIdentity.of(sbn.packageName, sbn.notification)
+            RelayCallerIdentity.of(this, sbn.packageName, sbn.notification)
                 ?.also { RelayRecentCallers.remember(it) }
         } else null
         relay.onAlert(
