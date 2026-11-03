@@ -88,6 +88,29 @@ class FitbitAirDiagnostics {
         });
   }
 
+  /// Asks `/settings` which selectors answer, in one secure session.
+  ///
+  /// Sends the selector-only message the haptic read already uses, with the
+  /// selector varied and haptics itself left out. Returns the raw reply bytes
+  /// as hex, which is the point: a settings value cannot be interpreted
+  /// without seeing it. Research tooling, on an undocumented surface.
+  static Future<List<Map<String, Object?>>> probeSettings() async {
+    final value = await _methods.invokeMapMethod<String, Object?>(
+      'probeSettings',
+    );
+    if (value == null) {
+      throw const FitbitAirException(
+        'EMPTY_RESPONSE',
+        'Settings probe returned no result.',
+      );
+    }
+    return List.unmodifiable(
+      (value['settings']! as List).map(
+        (entry) => Map<String, Object?>.from(entry as Map),
+      ),
+    );
+  }
+
   /// One secure session, four fixed source-traced GET requests. Never writes
   /// settings or returns raw bodies, alarm times, or activity measurements.
   /// This is research tooling, not a promise of access or sync coexistence.

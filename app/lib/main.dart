@@ -304,6 +304,7 @@ class _DemoPageState extends State<DemoPage> with WidgetsBindingObserver {
       ),
       'probeBattery': DemoAction(_probeBattery),
       'probeResources': DemoAction(_probeResources),
+      'probeSettings': DemoAction(_probeSettings),
       'headlessHaptic': DemoAction(
         _headlessTest,
         parameters: () => {'delaySeconds': 15},
@@ -653,6 +654,18 @@ class _DemoPageState extends State<DemoPage> with WidgetsBindingObserver {
           },
         );
   }
+
+  Future<void> _probeSettings() =>
+      _run('Asking which settings exist…', () async {
+        final results = await FitbitAirDiagnostics.probeSettings();
+        final answered = results
+            .where((entry) => entry['responseClass'] == 2)
+            .map((entry) => entry['selector'])
+            .toList();
+        return answered.isEmpty
+            ? 'No setting besides haptics answered.'
+            : 'Settings that answered: ${answered.join(", ")}. See the log for their bytes.';
+      });
 
   Future<void> _probeResources() =>
       _run('Checking four read-only resources in one session…', () async {
@@ -1186,6 +1199,11 @@ class _DemoPageState extends State<DemoPage> with WidgetsBindingObserver {
       'probeResources',
       'Research: read-only resource access',
       Icons.science_outlined,
+    ),
+    _action(
+      'probeSettings',
+      'Research: which settings exist (writes a selector)',
+      Icons.tune,
     ),
     _action(
       'headlessHaptic',
