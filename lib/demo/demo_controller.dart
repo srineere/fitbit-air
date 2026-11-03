@@ -858,18 +858,6 @@ class DemoController extends ChangeNotifier {
     {'enabled': enabled, 'startMinute': start, 'endMinute': end},
   );
 
-  Future<void> saveToneRules({
-    required bool enabled,
-    VibrationPreset? urgent,
-    VibrationPreset? negative,
-    VibrationPreset? neutral,
-  }) => _relayCall('saveToneRules', {
-    'enabled': enabled,
-    'urgent': urgent?.id,
-    'negative': negative?.id,
-    'neutral': neutral?.id,
-  });
-
   Future<void> previewPreset(VibrationPreset preset) {
     if (_previewInFlight != null) {
       return Future<void>.error(StateError('Wait for the current test.'));
@@ -1246,10 +1234,7 @@ class DemoController extends ChangeNotifier {
     },
     'relay': {
       'running': relayRunning,
-      // Message tone categories stay on screen; shared reports leave them out.
-      'history': [
-        for (final entry in history) {...entry}..remove('tone'),
-      ],
+      'history': history,
       'everyoneElseSilent': settings.everyoneElseSilent,
       'savedChatCount': settings.chats.length,
       'captureDiagnostics': captureDiagnostics,
@@ -1261,7 +1246,6 @@ class DemoController extends ChangeNotifier {
       'chatOverrideCount': settings.chats.where((c) => c.preset != null).length,
       'silenceReason': settings.silenceReason,
       'quietEnabled': settings.quietEnabled,
-      'toneEnabled': settings.toneEnabled,
     },
     'trials': _trials,
     'manualObservations': _observations,

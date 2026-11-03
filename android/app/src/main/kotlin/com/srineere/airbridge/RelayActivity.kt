@@ -6,7 +6,7 @@ import org.json.JSONObject
 
 /**
  * Strictly metadata: no notification keys, text, sender names, or BLE identifiers.
- * [preset] is the chosen vibration and [tone] the message tone category, both as ids.
+ * [preset] is the chosen vibration, as an id.
  */
 internal data class RelayActivity(
     val commandId: String,
@@ -16,13 +16,12 @@ internal data class RelayActivity(
     val latencyMillis: Long? = null,
     val errorCode: String? = null,
     val preset: String? = null,
-    val tone: String? = null,
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
         "commandId" to commandId, "sourcePackage" to sourcePackage,
         "stage" to stage, "atMillis" to atMillis,
         "latencyMillis" to latencyMillis, "errorCode" to errorCode,
-        "preset" to preset, "tone" to tone,
+        "preset" to preset,
     )
 }
 
@@ -48,8 +47,7 @@ internal object RelayHistory {
                 if (value.isNull("latencyMillis")) null else value.getLong("latencyMillis"),
                 if (value.isNull("errorCode")) null else value.getString("errorCode"),
                 // Entries saved before these fields existed have neither key.
-                if (value.isNull("preset")) null else value.getString("preset"),
-                if (value.isNull("tone")) null else value.getString("tone"))
+                if (value.isNull("preset")) null else value.getString("preset"))
         }
     }.getOrDefault(emptyList())
 

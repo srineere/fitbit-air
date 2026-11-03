@@ -36,20 +36,7 @@ class CalendarNotificationListener : NotificationListenerService() {
         Log.i("AirBridge", "posted pkg=${sbn.packageName} ongoing=${sbn.isOngoing} " +
             "category=${sbn.notification.category} fullScreen=${sbn.notification.fullScreenIntent != null} " +
             "channel=${if (Build.VERSION.SDK_INT >= 26) sbn.notification.channelId else null}")
-        // Opt-in: the text stays local to this call; only the tone reaches the relay.
-        val tone = if (!relay.toneEnabled) null else runCatching {
-            val ranking = NotificationListenerService.Ranking()
-                .takeIf { currentRanking?.getRanking(sbn.key, it) == true }
-            RelayToneClassifier.classify(latestMessageText(sbn.notification)?.toString(),
-                RelayNotificationSignals.from(sbn.notification, ranking, System.currentTimeMillis()),
-                RelayToneLexicons.shared(this))
-        }.getOrNull()
-        // A notification update is never taken as the call ending: a dialer
-        // repaints the same key as an ongoing call while it is still ringing.
-        // Only the ringer decides that, in CalendarRelayService's ring watch.
         val kind = RelayAlertClassifier.classify(sbn.notification, sbn.isOngoing)
-        // Who is calling, when the app says. Hashed; the number never leaves
-        // RelayCallerIdentity, and the label stays on this phone.
         if (kind == RelayAlertKind.CALL) RelayAppSelection.rememberCalling(this, sbn.packageName)
         val caller = if (kind == RelayAlertKind.CALL) {
             RelayCallerIdentity.of(this, sbn.packageName, sbn.notification)
@@ -62,7 +49,7 @@ class CalendarNotificationListener : NotificationListenerService() {
             sbn.packageName, sbn.key, sbn.postTime, sbn.isOngoing,
             sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0,
             latestMessageTimestamp(sbn.notification),
-            RelayConversations.identities(sbn.packageName, sbn.notification), tone, kind,
+            RelayConversations.identities(sbn.packageName, sbn.notification), kind,
             caller?.id
         )
     }
@@ -85,17 +72,6 @@ class CalendarNotificationListener : NotificationListenerService() {
                     notification.extras.getParcelableArray(Notification.EXTRA_MESSAGES)
                 ).maxOfOrNull { it.timestamp }?.takeIf { it > 0 }
             }.getOrNull()
-        }
-
-        @Suppress("DEPRECATION")
-        fun latestMessageText(notification: Notification): CharSequence? {
-            if (Build.VERSION.SDK_INT >= 30) runCatching {
-                Notification.MessagingStyle.Message.getMessagesFromBundleArray(
-                    notification.extras.getParcelableArray(Notification.EXTRA_MESSAGES)
-                ).maxByOrNull { it.timestamp }?.text
-            }.getOrNull()?.let { return it }
-            return notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
-                ?: notification.extras.getCharSequence(Notification.EXTRA_TEXT)
         }
 
         fun captureExisting() {

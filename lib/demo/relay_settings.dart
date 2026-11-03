@@ -195,10 +195,6 @@ class RelaySettings {
     this.startMinute = 1320,
     this.endMinute = 420,
     this.silenceReason,
-    this.toneEnabled = false,
-    this.toneUrgent,
-    this.toneNegative,
-    this.toneNeutral,
   });
   final VibrationPreset defaultPreset;
 
@@ -227,16 +223,8 @@ class RelaySettings {
   final int endMinute;
   final String? silenceReason;
 
-  /// Message tone presets; null keeps the app or chat vibration.
-  final bool toneEnabled;
-  final VibrationPreset? toneUrgent;
-  final VibrationPreset? toneNegative;
-  final VibrationPreset? toneNeutral;
-
   factory RelaySettings.fromMap(Map map) {
     final appMap = map['apps'] as Map? ?? {};
-    VibrationPreset? optional(Object? value) =>
-        value == null ? null : VibrationPreset.parse(value);
     return RelaySettings(
       defaultPreset: VibrationPreset.parse(map['defaultPreset']),
       defaultCallPreset: map['defaultCallPreset'] == null
@@ -280,10 +268,6 @@ class RelaySettings {
       startMinute: map['startMinute'] as int? ?? 1320,
       endMinute: map['endMinute'] as int? ?? 420,
       silenceReason: map['silenceReason'] as String?,
-      toneEnabled: map['toneEnabled'] == true,
-      toneUrgent: optional(map['toneUrgent']),
-      toneNegative: optional(map['toneNegative']),
-      toneNeutral: optional(map['toneNeutral']),
     );
   }
 }

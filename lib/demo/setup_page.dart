@@ -361,7 +361,7 @@ class _RelaySetupPageState extends State<RelaySetupPage> {
                               const SizedBox(height: 8),
                               const Text(
                                 'With notification access, Air Bridge reads the notifications on this phone from all apps, including their app name, title and text, also while it runs in the background. It uses them only to decide which ones vibrate your Air.\n\n'
-                                'Everything stays on this phone. Air Bridge has no internet access, and never stores, uploads or shares notification content. It keeps only a short local history (app, time, result and, if you turn on Message tone, its category) and the chat names you choose.',
+                                'Everything stays on this phone. Air Bridge has no internet access, and never stores, uploads or shares notification content. It keeps only a short local history (app, time and result) and the names you choose.',
                               ),
                               TextButton(
                                 key: const ValueKey('setup-privacy-policy'),

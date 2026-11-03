@@ -14,7 +14,7 @@ class RelayActivityTest {
 
     @Test fun historyOnlyExposesMetadataFields() {
         val value = RelayActivity("command-1", "com.whatsapp", "verified", 100, 20).toMap()
-        assertEquals(setOf("commandId", "sourcePackage", "stage", "atMillis", "latencyMillis", "errorCode", "preset", "tone"), value.keys)
+        assertEquals(setOf("commandId", "sourcePackage", "stage", "atMillis", "latencyMillis", "errorCode", "preset"), value.keys)
         assertEquals(20L, value["latencyMillis"])
     }
 

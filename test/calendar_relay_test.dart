@@ -188,15 +188,6 @@ void main() {
                   : DateTime.now().millisecondsSinceEpoch + minutes * 60000;
               rules['silenceReason'] = minutes == 0 ? null : 'paused';
               return null;
-            case 'saveToneRules':
-              final args = call.arguments as Map;
-              rules.addAll({
-                'toneEnabled': args['enabled'],
-                'toneUrgent': args['urgent'],
-                'toneNegative': args['negative'],
-                'toneNeutral': args['neutral'],
-              });
-              return null;
             case 'saveQuietHours':
               final args = call.arguments as Map;
               rules.addAll({
@@ -860,7 +851,6 @@ void main() {
         'atMillis': 1000,
         'latencyMillis': 125,
         'preset': 'double',
-        'tone': 'urgent',
       },
       {
         'commandId': 'two',
@@ -885,7 +875,7 @@ void main() {
     expect(
       find.descendant(
         of: target,
-        matching: find.textContaining('Sent · Two pulses · Strong · Urgent'),
+        matching: find.textContaining('Sent · Two pulses · Strong'),
       ),
       findsOneWidget,
     );
@@ -893,7 +883,6 @@ void main() {
     expect(controller.exportJson(), contains('TIMEOUT'));
     expect(controller.exportJson(), contains('"preset": "double"'));
     expect(controller.exportJson(), isNot(contains('urgent')));
-    expect(controller.history.first['tone'], 'urgent');
     await tap(tester, 'activity-two-failed');
     expect(find.textContaining('delivery is uncertain'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
@@ -1075,29 +1064,4 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('message tone asks before reading message text', (tester) async {
-    access = true;
-    await mount(tester);
-    await tap(tester, 'nav-rules');
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('message-tone')),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(
-      find.byKey(const ValueKey('message-tone-experimental')),
-      findsOneWidget,
-    );
-    await tap(tester, 'message-tone');
-    expect(find.byKey(const ValueKey('message-tone-consent')), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-    expect(calls, isNot(contains('saveToneRules')));
-    expect(controller.settings.toneEnabled, isFalse);
-    await tap(tester, 'message-tone');
-    await tap(tester, 'message-tone-confirm');
-    expect(calls, contains('saveToneRules'));
-    expect(controller.settings.toneEnabled, isTrue);
-    await tester.pumpWidget(const SizedBox());
-  });
 }

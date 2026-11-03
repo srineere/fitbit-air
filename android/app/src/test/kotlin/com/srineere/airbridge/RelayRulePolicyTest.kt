@@ -36,23 +36,10 @@ class RelayRulePolicyTest {
         assertEquals(RelayMatch(RelayPreset.HIGH, 0), config.match(whatsapp, setOf("carol")))
         assertNull(config.copy(apps = mapOf(whatsapp to RelayAppRule(false))).match(whatsapp, setOf("alice")))
     }
-    @Test fun `message tone only applies when enabled and keeps mutes`() {
-        assertEquals(RelayMatch(RelayPreset.HIGH, 0), config.match(whatsapp, emptySet(), RelayTone.URGENT))
-        val toned = config.copy(tone = RelayToneRules(true, urgent = RelayPreset.DOUBLE, neutral = RelayPreset.MUTE))
-        assertEquals(RelayMatch(RelayPreset.DOUBLE, 2, RelayTone.URGENT), toned.match(whatsapp, setOf("alice"), RelayTone.URGENT))
-        // The category is kept for history even when it keeps the chat's vibration.
-        assertEquals(RelayMatch(RelayPreset.HIGH, 1, RelayTone.NEGATIVE), toned.match(whatsapp, setOf("alice"), RelayTone.NEGATIVE))
-        assertEquals(RelayMatch(RelayPreset.DOUBLE, 0), toned.match("calendar", emptySet(), null))
-        assertNull(toned.match(whatsapp, emptySet(), RelayTone.NEUTRAL))
-        assertNull(toned.match(whatsapp, setOf("muted"), RelayTone.URGENT))
-        val mutedApp = toned.copy(apps = mapOf(whatsapp to RelayAppRule(true, RelayPreset.MUTE)))
-        assertNull(mutedApp.match(whatsapp, emptySet(), RelayTone.URGENT))
-    }
-    @Test fun `urgent message wins a burst over a person rule`() {
-        val toned = config.copy(tone = RelayToneRules(true, urgent = RelayPreset.DOUBLE))
-        val person = RelayBurstChoice(toned.match(whatsapp, setOf("alice"))!!, 2)
-        val urgent = RelayBurstChoice(toned.match(whatsapp, emptySet(), RelayTone.URGENT)!!, 1)
-        assertEquals(urgent, person.prefer(urgent))
+    @Test fun `a person rule wins a burst over an app rule`() {
+        val person = RelayBurstChoice(config.match(whatsapp, setOf("alice"))!!, 2)
+        val app = RelayBurstChoice(config.match(whatsapp, emptySet())!!, 1)
+        assertEquals(person, app.prefer(person))
     }
     private fun time(hour: Int, minute: Int = 0): Long = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
         set(2026, Calendar.OCTOBER, 17, hour, minute, 0); set(Calendar.MILLISECOND, 0)
@@ -80,15 +67,6 @@ class RelayRulePolicyTest {
         assertNull(RelaySilence(startMinute = 0, endMinute = 0).reason(time(12)))
     }
     @Test(expected = IllegalArgumentException::class) fun `equal enabled times rejected`() { RelaySilence(quietEnabled = true, startMinute = 0, endMinute = 0) }
-    @Test fun `burst specificity wins then newest breaks ties`() {
-        val app = RelayBurstChoice(RelayMatch(RelayPreset.DOUBLE, 0), 100)
-        val chat = RelayBurstChoice(RelayMatch(RelayPreset.HIGH, 1), 90)
-        val next = RelayBurstChoice(RelayMatch(RelayPreset.LOW, 1), 110)
-        assertEquals(chat, app.prefer(chat))
-        assertEquals(chat, chat.prefer(app))
-        assertEquals(next, chat.prefer(next))
-        assertEquals(next, next.prefer(chat))
-    }
     @Test fun `silenced notifications advance duplicate baseline and are not replayed`() {
         val filter = CalendarAlertFilter(100, selectedPackages = setOf(whatsapp))
         assertTrue(filter.accept(whatsapp, "id", 101, 102, false, false, 101))

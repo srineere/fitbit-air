@@ -39,9 +39,6 @@ class CalendarRelayService : Service() {
     private var sequence = 0
     private val inFlight = mutableMapOf<String, Pair<String?, Long>>()
     private var selectedPackages = emptySet<String>()
-    /** Read by the listener so message text is only inspected after the user opts in. */
-    var toneEnabled = false
-        private set
     private var pulseStyle = "single"
     private val previewReplies = mutableMapOf<String, (RelayWorkerResult) -> Unit>()
     private val choices = mutableMapOf<String, RelayBurstChoice>()
@@ -108,9 +105,7 @@ class CalendarRelayService : Service() {
     fun settingsChanged() {
         val config = RelayRuleStore.read(this)
         val packages = config.selectedPackages
-        toneEnabled = config.tone.enabled
         ringSettings = config.ring
-        if (toneEnabled) RelayToneLexicons.preload(this)
         if (packages != selectedPackages) {
             selectedPackages = packages
             if (ready) filter = CalendarAlertFilter(System.currentTimeMillis(),
@@ -199,8 +194,6 @@ class CalendarRelayService : Service() {
         }
         if (engine != null) return START_STICKY
         selectedPackages = RelayRuleStore.read(this).selectedPackages
-        toneEnabled = RelayRuleStore.read(this).tone.enabled
-        if (toneEnabled) RelayToneLexicons.preload(this)
         pulseStyle = RelayAppSelection.pulseStyle(this)
         if (selectedPackages.isEmpty()) {
             saveOutcome("Select at least one notification app before starting.")
@@ -293,7 +286,7 @@ class CalendarRelayService : Service() {
 
     fun acceptsPackage(packageName: String): Boolean = ready && !stopping && packageName in selectedPackages
 
-    internal fun onAlert(packageName: String, key: String, postedAt: Long, ongoing: Boolean, summary: Boolean, messageTimestamp: Long?, conversationIds: Set<String>, tone: RelayTone? = null, kind: RelayAlertKind = RelayAlertKind.MESSAGE,
+    internal fun onAlert(packageName: String, key: String, postedAt: Long, ongoing: Boolean, summary: Boolean, messageTimestamp: Long?, conversationIds: Set<String>, kind: RelayAlertKind = RelayAlertKind.MESSAGE,
                            callerId: String? = null) {
         if (!ready || stopping) return
         val now = System.currentTimeMillis()
@@ -303,24 +296,23 @@ class CalendarRelayService : Service() {
             return
         }
         val config = RelayRuleStore.read(this)
-        val match = config.match(packageName, conversationIds, tone, kind, callerId)
-        val category = tone?.takeIf { config.tone.enabled }
+        val match = config.match(packageName, conversationIds, kind, callerId)
         if (match == null) {
             Log.i(TAG, "dropped pkg=$packageName kind=$kind by=rule (silent or app off)")
-            record(nextId(), packageName, postedAt, "filtered", tone = category)
+            record(nextId(), packageName, postedAt, "filtered")
             return
         }
         val silence = config.silence.reason(now)
         if (silence != null) {
             Log.i(TAG, "dropped pkg=$packageName kind=$kind by=$silence")
             cancelWaiting(silence)
-            record(nextId(), packageName, postedAt, silence, tone = category)
+            record(nextId(), packageName, postedAt, silence)
             return
         }
         // One ring at a time, and nothing else buzzes during it: a message pulse
         // in the middle of a ring is indistinguishable from the ring itself.
         Log.i(TAG, "alert pkg=$packageName kind=$kind ongoing=$ongoing preset=${match.preset.id}")
-        if (ring != null) { record(nextId(), packageName, postedAt, "ringing", tone = category); return }
+        if (ring != null) { record(nextId(), packageName, postedAt, "ringing"); return }
         if (match.preset == RelayPreset.RING) {
             if (rangAlready(key, now)) { record(nextId(), packageName, postedAt, "ring_done"); return }
             startRing(key, packageName, match, callerId)
@@ -589,10 +581,10 @@ class CalendarRelayService : Service() {
     private fun nextId() = "relay-${System.currentTimeMillis()}-${++sequence}"
 
     private fun record(id: String, sbnPackage: String?, postedAt: Long, stage: String, code: String? = null,
-                       match: RelayMatch? = null, tone: RelayTone? = match?.tone) {
+                       match: RelayMatch? = null) {
         val now = System.currentTimeMillis()
         RelayHistory.add(this, RelayActivity(id, sbnPackage, stage, now, maxOf(0, now - postedAt), code,
-            match?.preset?.id, tone?.id))
+            match?.preset?.id))
     }
 
     fun requestStop(reason: String) {

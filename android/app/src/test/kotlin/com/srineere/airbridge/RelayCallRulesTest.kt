@@ -51,23 +51,23 @@ class RelayCallRulesTest {
             everyoneElseSilent = true,
         )
         val call = RelayAlertKind.CALL
-        assertEquals(RelayPreset.RING, config.match("com.whatsapp", setOf("alice"), null, call)?.preset)
-        assertEquals(RelayPreset.HIGH, config.match("com.instagram", emptySet(), null, call)?.preset)
-        assertEquals(RelayPreset.LOW, config.match("com.instagram", emptySet(), null)?.preset)
+        assertEquals(RelayPreset.RING, config.match("com.whatsapp", setOf("alice"), call)?.preset)
+        assertEquals(RelayPreset.HIGH, config.match("com.instagram", emptySet(), call)?.preset)
+        assertEquals(RelayPreset.LOW, config.match("com.instagram", emptySet())?.preset)
         // The same unsaved WhatsApp contact is silenced as a message and still
         // rings as a call: "everyone else: silent" is a rule about messages.
-        assertNull(config.match("com.whatsapp", emptySet(), null))
-        assertEquals(RelayPreset.RING, config.match("com.whatsapp", emptySet(), null, call)?.preset)
+        assertNull(config.match("com.whatsapp", emptySet()))
+        assertEquals(RelayPreset.RING, config.match("com.whatsapp", emptySet(), call)?.preset)
     }
 
     @Test fun `an app can be silent for messages and still ring for calls`() {
         val config = RelayRuleConfig(
             apps = mapOf("com.whatsapp" to RelayAppRule(true, RelayPreset.MUTE, RelayPreset.RING)),
         )
-        assertNull(config.match("com.whatsapp", emptySet(), null))
+        assertNull(config.match("com.whatsapp", emptySet()))
         assertEquals(
             RelayPreset.RING,
-            config.match("com.whatsapp", emptySet(), null, RelayAlertKind.CALL)?.preset,
+            config.match("com.whatsapp", emptySet(), RelayAlertKind.CALL)?.preset,
         )
     }
 
@@ -75,8 +75,8 @@ class RelayCallRulesTest {
         val config = RelayRuleConfig(
             apps = mapOf("com.whatsapp" to RelayAppRule(true, RelayPreset.HIGH, RelayPreset.MUTE)),
         )
-        assertEquals(RelayPreset.HIGH, config.match("com.whatsapp", emptySet(), null)?.preset)
-        assertNull(config.match("com.whatsapp", emptySet(), null, RelayAlertKind.CALL))
+        assertEquals(RelayPreset.HIGH, config.match("com.whatsapp", emptySet())?.preset)
+        assertNull(config.match("com.whatsapp", emptySet(), RelayAlertKind.CALL))
     }
 
     @Test fun `a muted call preset drops the alert rather than ringing silently`() {
@@ -84,12 +84,12 @@ class RelayCallRulesTest {
             defaultCallPreset = RelayPreset.MUTE,
             apps = mapOf("com.whatsapp" to RelayAppRule(true)),
         )
-        assertNull(config.match("com.whatsapp", emptySet(), null, RelayAlertKind.CALL))
+        assertNull(config.match("com.whatsapp", emptySet(), RelayAlertKind.CALL))
     }
 
     @Test fun `a disabled app stays silent for calls too`() {
         val config = RelayRuleConfig(apps = mapOf("com.whatsapp" to RelayAppRule(false)))
-        assertNull(config.match("com.whatsapp", emptySet(), null, RelayAlertKind.CALL))
+        assertNull(config.match("com.whatsapp", emptySet(), RelayAlertKind.CALL))
     }
 
     @Test fun `a call grouped under a summary still rings`() {
@@ -209,7 +209,7 @@ class RelayCallRulesTest {
 
     @Test fun `a saved caller's own vibration outranks the app's`() {
         val config = withCallers(mapOf("alice" to SavedCaller(dialer, "Alice", RelayPreset.DOUBLE)))
-        val match = config.match(dialer, emptySet(), null, RelayAlertKind.CALL, "alice")
+        val match = config.match(dialer, emptySet(), RelayAlertKind.CALL, "alice")
         assertEquals(RelayPreset.DOUBLE, match?.preset)
         // More specific than an app rule, so it wins a burst.
         assertEquals(3, match?.specificity)
@@ -217,11 +217,11 @@ class RelayCallRulesTest {
 
     @Test fun `a caller can be silenced without silencing the app`() {
         val config = withCallers(mapOf("spam" to SavedCaller(dialer, "Spam", RelayPreset.MUTE)))
-        assertNull(config.match(dialer, emptySet(), null, RelayAlertKind.CALL, "spam"))
+        assertNull(config.match(dialer, emptySet(), RelayAlertKind.CALL, "spam"))
         // Everyone else still rings.
         assertEquals(
             RelayPreset.RING,
-            config.match(dialer, emptySet(), null, RelayAlertKind.CALL, "someone")?.preset,
+            config.match(dialer, emptySet(), RelayAlertKind.CALL, "someone")?.preset,
         )
     }
 
@@ -232,9 +232,9 @@ class RelayCallRulesTest {
         )
         assertEquals(
             RelayPreset.RING,
-            config.match(dialer, emptySet(), null, RelayAlertKind.CALL, "alice")?.preset,
+            config.match(dialer, emptySet(), RelayAlertKind.CALL, "alice")?.preset,
         )
-        assertNull(config.match(dialer, emptySet(), null, RelayAlertKind.CALL, "bob"))
+        assertNull(config.match(dialer, emptySet(), RelayAlertKind.CALL, "bob"))
     }
 
     @Test fun `a call nobody can be attributed to still rings`() {
@@ -246,7 +246,7 @@ class RelayCallRulesTest {
         )
         assertEquals(
             RelayPreset.RING,
-            config.match(dialer, emptySet(), null, RelayAlertKind.CALL, null)?.preset,
+            config.match(dialer, emptySet(), RelayAlertKind.CALL, null)?.preset,
         )
     }
 
@@ -254,7 +254,7 @@ class RelayCallRulesTest {
         val config = withCallers(mapOf("alice" to SavedCaller(dialer, "Alice", RelayPreset.MUTE)))
         assertEquals(
             RelayPreset.HIGH,
-            config.match(dialer, emptySet(), null, RelayAlertKind.MESSAGE, "alice")?.preset,
+            config.match(dialer, emptySet(), RelayAlertKind.MESSAGE, "alice")?.preset,
         )
     }
 

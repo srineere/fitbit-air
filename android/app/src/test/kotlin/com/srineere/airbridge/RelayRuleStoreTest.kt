@@ -18,12 +18,6 @@ class RelayRuleStoreTest {
         assertNull(actual.apps["com.calendar"]!!.callPreset)
         assertTrue(actual.apps["com.whatsapp"]!!.enabled)
     }
-    @Test fun `tone rules round trip and older configs decode with tone off`() {
-        val expected = RelayRuleConfig(tone = RelayToneRules(true, RelayPreset.DOUBLE, null, RelayPreset.MUTE))
-        assertEquals(expected, RelayRuleStore.decode(JSONObject(RelayRuleStore.encode(expected).toString())))
-        val legacy = RelayRuleStore.encode(RelayRuleConfig(RelayPreset.LOW)).apply { remove("tone") }
-        assertEquals(RelayToneRules(), RelayRuleStore.decode(legacy).tone)
-    }
     @Test(expected = IllegalArgumentException::class) fun `newer schema is not treated as an empty default`() {
         val json = RelayRuleStore.encode(RelayRuleConfig()).put("version", 5)
         RelayRuleStore.decode(json)
