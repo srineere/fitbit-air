@@ -8,13 +8,16 @@ import java.security.MessageDigest
 /**
  * Who is calling, taken from the `CallStyle` notification the dialer posts.
  *
- * The identity is a hash of the caller's URI, which is a `tel:` number for a
- * phone call. A number is stable in the ways a name is not: it survives the
+ * The identity is a hash of the caller's handle, which for a phone call is a
+ * `tel:` number. A number is stable in the ways a name is not: it survives the
  * contact being renamed, and it exists for callers who are not in contacts at
- * all. The raw number never leaves this function; only its hash is stored, and
- * the display name is kept as a label for the user's own list.
+ * all. The raw number never leaves this file; only the hash is stored, and the
+ * display name is kept as a label for the user's own list.
  */
 internal object RelayCallerIdentity {
+    /** Separator for hashed parts; not valid inside a number or a package. */
+    private const val SEPARATOR = "|"
+
     /** Available from API 31 as a constant; the key itself is older. */
     private const val EXTRA_CALL_PERSON = "android.callPerson"
 
@@ -23,6 +26,36 @@ internal object RelayCallerIdentity {
         .joinToString("") { "%02x".format(it.toInt() and 255) }
 
     data class Caller(val id: String, val label: String)
+
+    /**
+     * Compares phone numbers by their last digits, so `+91 98765 43210`,
+     * `098765 43210` and `tel:+919876543210` are one person. Two numbers
+     * sharing their last ten digits in different countries would collide; on a
+     * personal phone that is rarer than one contact written three ways.
+     */
+    private fun normalize(handle: String): String? {
+        val trimmed = handle.removePrefix("tel:").trim()
+        val decoded = runCatching {
+            java.net.URLDecoder.decode(trimmed, "UTF-8")
+        }.getOrDefault(trimmed)
+        val digits = decoded.filter { it.isDigit() }
+        if (digits.length >= 7) return "tel:" + digits.takeLast(10)
+        return decoded.lowercase().takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * The stored identity for a handle. A phone number deliberately leaves the
+     * app out of the hash: the same person calling through the dialer or
+     * through a messaging app is still the same person. Anything else is an
+     * app's own identifier and only means something inside that app.
+     */
+    fun identityOf(packageName: String, handle: String): String? {
+        if (handle.length > 512) return null
+        val normalized = normalize(handle) ?: return null
+        val seed = if (normalized.startsWith("tel:")) normalized
+        else packageName + SEPARATOR + normalized
+        return hash("caller" + SEPARATOR + seed)
+    }
 
     @Suppress("DEPRECATION")
     private fun person(notification: Notification): Person? {
@@ -45,19 +78,19 @@ internal object RelayCallerIdentity {
         val stable = person?.uri?.takeIf { it.isNotBlank() }
             ?: person?.key?.takeIf { it.isNotBlank() }
         val name = person?.name?.toString()?.takeIf { it.isNotBlank() }
-        // Without a stable handle, a name is better than nothing, but it is
-        // the caller's display name and changes when the contact is renamed.
+        // Without a stable handle a name is better than nothing, but it is a
+        // display name and changes when the contact is renamed.
         val identity = stable ?: name ?: return null
-        if (identity.length > 512) return null
         return Caller(
-            id = hash("caller\u0000$packageName\u0000$identity"),
+            id = identityOf(packageName, identity) ?: return null,
             label = name ?: "Unknown caller",
         )
     }
 }
 
 /**
- * Callers seen recently, so the user can add one without typing a number.
+ * Callers seen recently, so someone who has just called can be given a rule
+ * even when they are not in contacts.
  *
  * Held in memory only and bounded: a caller the user never saves is forgotten
  * when the relay stops. Labels stay on this phone and never reach a report.
@@ -73,7 +106,7 @@ internal object RelayRecentCallers {
         while (recent.size > LIMIT) recent.remove(recent.keys.first())
     }
 
-    /** Newest first, excluding callers the user has already saved. */
+    /** Newest first, excluding callers that already have a rule. */
     @Synchronized
     fun list(saved: Set<String>): List<Map<String, String>> = recent.entries
         .reversed()

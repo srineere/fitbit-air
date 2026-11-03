@@ -739,6 +739,25 @@ class DemoController extends ChangeNotifier {
     'callPreset': callPreset?.id,
   });
 
+  /// Contacts shown in the caller list, and whether Android has allowed it.
+  /// Numbers never arrive here: each entry is the same hashed identity a call
+  /// is matched by, plus a display name.
+  List<SavedCaller> contacts = const [];
+  bool contactsGranted = false;
+
+  Future<void> loadContacts() async {
+    final result = await channel.invokeMapMethod<String, Object?>('contacts');
+    contactsGranted = result?['granted'] == true;
+    contacts = [
+      for (final caller in result?['contacts'] as List? ?? const [])
+        SavedCaller.fromMap(caller as Map),
+    ];
+    _changed();
+  }
+
+  Future<void> requestContacts() =>
+      channel.invokeMethod<void>('requestContacts');
+
   /// Saves a caller's own call vibration. [label] is needed the first time,
   /// when the caller is still only something the relay has seen.
   Future<void> saveCaller(String id, VibrationPreset? preset, {String? label}) =>

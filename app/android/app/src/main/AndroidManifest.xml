@@ -7,6 +7,9 @@
     <!-- Sideloaded relay: the user is asked for this in Rules, and Android
          shows its own confirmation. Without it Doze stops background work. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Optional, and asked for only when the caller list is opened: names for
+         people who have not called yet. Numbers are hashed, never stored. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
     <application
         android:allowBackup="false"
         android:fullBackupContent="@xml/backup_rules"

@@ -117,6 +117,20 @@ class MainActivity : FlutterActivity() {
                             else startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
                             result.success(null)
                         }
+                        "contacts" -> {
+                            result.success(mapOf(
+                                "granted" to RelayContacts.granted(this),
+                                "contacts" to RelayContacts.list(this),
+                            ))
+                        }
+                        "requestContacts" -> {
+                            // Android shows its own prompt; declining leaves
+                            // the caller list to recent callers only.
+                            if (!RelayContacts.granted(this)) {
+                                requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS), 903)
+                            }
+                            result.success(null)
+                        }
                         "saveCaller" -> {
                             val id = requireNotNull(call.argument<String>("id"))
                             val label = call.argument<String>("label")
