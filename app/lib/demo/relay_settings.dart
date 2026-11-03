@@ -140,11 +140,15 @@ class SavedCaller {
     required this.id,
     required this.label,
     required this.packageName,
+    this.detail,
     this.preset,
   });
   final String id;
   final String label;
   final String packageName;
+
+  /// The number this rule is for; one contact often has several.
+  final String? detail;
 
   /// Null uses the app's call vibration; silent mutes this caller alone.
   final VibrationPreset? preset;
@@ -153,6 +157,9 @@ class SavedCaller {
     id: map['id'] as String,
     label: map['label'] as String? ?? 'Caller',
     packageName: map['packageName'] as String? ?? 'com.google.android.dialer',
+    detail: (map['detail'] as String?)?.trim().isNotEmpty == true
+        ? (map['detail'] as String).trim()
+        : null,
     preset: map['preset'] == null ? null : VibrationPreset.parse(map['preset']),
   );
 }

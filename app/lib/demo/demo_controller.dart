@@ -760,12 +760,17 @@ class DemoController extends ChangeNotifier {
 
   /// Saves a caller's own call vibration. [label] is needed the first time,
   /// when the caller is still only something the relay has seen.
-  Future<void> saveCaller(String id, VibrationPreset? preset, {String? label}) =>
-      _relayCall('saveCaller', {
-        'id': id,
-        'preset': preset?.id,
-        'label': ?label,
-      });
+  Future<void> saveCaller(
+    String id,
+    VibrationPreset? preset, {
+    String? label,
+    String? detail,
+  }) => _relayCall('saveCaller', {
+    'id': id,
+    'preset': preset?.id,
+    'label': ?label,
+    'detail': ?detail,
+  });
 
   Future<void> removeCaller(String id) => _relayCall('removeCaller', {'id': id});
 

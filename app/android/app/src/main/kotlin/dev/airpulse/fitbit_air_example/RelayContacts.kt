@@ -28,7 +28,7 @@ internal object RelayContacts {
     fun list(context: Context, packageName: String = "com.google.android.dialer"):
         List<Map<String, String>> {
         if (!granted(context)) return emptyList()
-        val found = linkedMapOf<String, String>()
+        val found = linkedMapOf<String, Pair<String, String>>()
         runCatching {
             context.contentResolver.query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
@@ -43,10 +43,12 @@ internal object RelayContacts {
                     val name = cursor.getString(0)?.takeIf { it.isNotBlank() } ?: continue
                     val number = cursor.getString(1)?.takeIf { it.isNotBlank() } ?: continue
                     val id = RelayCallerIdentity.identityOf(packageName, number) ?: continue
-                    found.putIfAbsent(id, name)
+                    found.putIfAbsent(id, name to number)
                 }
             }
         }
-        return found.entries.map { mapOf("id" to it.key, "label" to it.value) }
+        return found.entries.map {
+            mapOf("id" to it.key, "label" to it.value.first, "detail" to it.value.second)
+        }
     }
 }

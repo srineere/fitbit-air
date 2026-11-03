@@ -25,7 +25,7 @@ internal object RelayCallerIdentity {
         .digest(value.toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it.toInt() and 255) }
 
-    data class Caller(val id: String, val label: String)
+    data class Caller(val id: String, val label: String, val detail: String?)
 
     /**
      * Compares phone numbers by their last digits, so `+91 98765 43210`,
@@ -84,6 +84,9 @@ internal object RelayCallerIdentity {
         return Caller(
             id = identityOf(packageName, identity) ?: return null,
             label = name ?: "Unknown caller",
+            // Only a dialable handle is worth showing; an app's internal key
+            // would be noise.
+            detail = stable?.removePrefix("tel:")?.takeIf { it.any(Char::isDigit) },
         )
     }
 }
@@ -97,12 +100,12 @@ internal object RelayCallerIdentity {
  */
 internal object RelayRecentCallers {
     private const val LIMIT = 20
-    private val recent = linkedMapOf<String, String>()
+    private val recent = linkedMapOf<String, RelayCallerIdentity.Caller>()
 
     @Synchronized
     fun remember(caller: RelayCallerIdentity.Caller) {
         recent.remove(caller.id)
-        recent[caller.id] = caller.label
+        recent[caller.id] = caller
         while (recent.size > LIMIT) recent.remove(recent.keys.first())
     }
 
@@ -111,7 +114,9 @@ internal object RelayRecentCallers {
     fun list(saved: Set<String>): List<Map<String, String>> = recent.entries
         .reversed()
         .filterNot { it.key in saved }
-        .map { mapOf("id" to it.key, "label" to it.value) }
+        .map {
+            mapOf("id" to it.key, "label" to it.value.label, "detail" to (it.value.detail ?: ""))
+        }
 
     @Synchronized
     fun clear() = recent.clear()

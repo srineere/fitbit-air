@@ -97,6 +97,8 @@ internal data class SavedCaller(
     val packageName: String,
     val label: String,
     val preset: RelayPreset? = null,
+    /** The number, so a contact with several can tell its rules apart. */
+    val detail: String? = null,
 )
 
 /** [tone] is the message's category when message tone is on, for history. */

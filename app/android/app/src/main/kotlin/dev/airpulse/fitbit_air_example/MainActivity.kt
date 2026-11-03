@@ -134,13 +134,15 @@ class MainActivity : FlutterActivity() {
                         "saveCaller" -> {
                             val id = requireNotNull(call.argument<String>("id"))
                             val label = call.argument<String>("label")
+                            val detail = call.argument<String>("detail")
                             val preset = call.argument<String>("preset")?.let { RelayPreset.parse(it) }
                             RelayRuleStore.update(this) { config ->
                                 val existing = config.callers[id]
                                 require(existing != null || label != null) { "Unknown caller" }
                                 config.copy(callers = config.callers + (id to SavedCaller(
                                     existing?.packageName ?: "com.google.android.dialer",
-                                    label ?: existing!!.label, preset)))
+                                    label ?: existing!!.label, preset,
+                                    detail ?: existing?.detail)))
                             }
                             result.success(null)
                         }

@@ -63,6 +63,7 @@ class _CallerRulesPageState extends State<CallerRulesPage> {
           caller.id,
           value,
           label: isNew ? caller.label : null,
+          detail: isNew ? caller.detail : null,
         ),
       );
 
@@ -75,10 +76,16 @@ class _CallerRulesPageState extends State<CallerRulesPage> {
     ),
     title: Text(caller.label),
     subtitle: Text(
-      isNew
-          ? 'Uses the default · tap to change'
-          : caller.preset?.label ??
-                'Default: ${settings.defaultCallPreset.label}',
+      [
+        // One contact often has several numbers, and the rule is for one
+        // of them, so the row has to say which.
+        ?caller.detail,
+        if (isNew)
+          'Uses the default'
+        else
+          caller.preset?.label ??
+              'Default: ${settings.defaultCallPreset.label}',
+      ].join(' · '),
     ),
     trailing: isNew
         ? const Icon(Icons.chevron_right)
@@ -118,7 +125,17 @@ class _CallerRulesPageState extends State<CallerRulesPage> {
         .toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Callers')),
+      appBar: AppBar(
+        title: const Text('Callers'),
+        actions: [
+          IconButton(
+            key: const ValueKey('resync-contacts'),
+            tooltip: 'Resync contacts',
+            icon: const Icon(Icons.sync),
+            onPressed: () => widget.perform(state.loadContacts),
+          ),
+        ],
+      ),
       body: ListView(
         children: [
           ListTile(
