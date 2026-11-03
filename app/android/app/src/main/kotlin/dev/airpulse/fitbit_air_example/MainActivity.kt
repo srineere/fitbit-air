@@ -109,6 +109,14 @@ class MainActivity : FlutterActivity() {
                             RelayRuleStore.update(this) { it.copy(apps = it.apps + (pkg to RelayAppRule(enabled, preset, callPreset))) }
                             result.success(null)
                         }
+                        "requestBatteryExemption" -> {
+                            // Android shows its own confirmation; this only asks.
+                            val uri = android.net.Uri.parse("package:$packageName")
+                            val ask = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, uri)
+                            if (ask.resolveActivity(packageManager) != null) startActivity(ask)
+                            else startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                            result.success(null)
+                        }
                         "saveDefaultCallPreset" -> {
                             val preset = RelayPreset.parse(requireNotNull(call.argument<String>("preset")))
                             RelayRuleStore.update(this) { it.copy(defaultCallPreset = preset) }

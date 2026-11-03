@@ -414,6 +414,10 @@ class DemoController extends ChangeNotifier {
   bool listenerConnected = false;
   bool? bluetoothEnabled;
   bool bluetoothPermission = false;
+
+  /// Whether Android has been told to leave the relay alone. Without it, Doze
+  /// and OEM battery management can stop it whenever the screen is off.
+  bool batteryExempt = true;
   bool? notificationControlsAllowed;
   bool? paired;
   String relayOutcome = 'Relay is off.';
@@ -595,6 +599,7 @@ class DemoController extends ChangeNotifier {
       listenerConnected = state['connected'] == true;
       bluetoothEnabled = state['bluetoothEnabled'] as bool?;
       bluetoothPermission = state['bluetoothPermission'] == true;
+      batteryExempt = state['batteryExempt'] != false;
       notificationControlsAllowed =
           state['notificationControlsAllowed'] as bool?;
       relayOutcome = state['outcome'] as String? ?? 'Relay is off.';
@@ -733,6 +738,11 @@ class DemoController extends ChangeNotifier {
     'preset': preset?.id,
     'callPreset': callPreset?.id,
   });
+
+  /// Asks Android to exempt the relay from battery optimisation. Android
+  /// shows its own confirmation; declining leaves everything as it was.
+  Future<void> requestBatteryExemption() =>
+      _relayCall('requestBatteryExemption', const {});
 
   /// Applies to calls from apps without their own call vibration.
   Future<void> saveDefaultCallPreset(VibrationPreset preset) =>

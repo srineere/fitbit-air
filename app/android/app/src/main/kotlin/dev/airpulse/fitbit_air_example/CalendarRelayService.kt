@@ -179,6 +179,9 @@ class CalendarRelayService : Service() {
             return START_NOT_STICKY
         }
         if (intent?.action == STOP) {
+            // An explicit stop is the user's decision and must survive a
+            // reboot, unlike a crash or an OEM kill.
+            setWanted(this, false)
             requestStop("Relay stopped.")
             return START_NOT_STICKY
         }
@@ -192,7 +195,7 @@ class CalendarRelayService : Service() {
             if (engine == null) stopSelf()
             return START_NOT_STICKY
         }
-        if (engine != null) return START_NOT_STICKY
+        if (engine != null) return START_STICKY
         selectedPackages = RelayRuleStore.read(this).selectedPackages
         toneEnabled = RelayRuleStore.read(this).tone.enabled
         if (toneEnabled) RelayToneLexicons.preload(this)
@@ -202,8 +205,8 @@ class CalendarRelayService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        if (!hasAccess(this) || !CalendarNotificationListener.connected) {
-            saveOutcome("Enable notification access and wait for the listener to connect, then start again.")
+        if (!hasAccess(this)) {
+            saveOutcome("Enable notification access, then start again.")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -217,6 +220,39 @@ class CalendarRelayService : Service() {
                 startForeground(902, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
             else startForeground(902, notification)
             active = this
+        } catch (error: Exception) {
+            saveOutcome("Relay startup failed: ${error.javaClass.simpleName}")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        // After a reboot or an OEM restart the system rebinds the listener a
+        // moment after this service starts, so a listener that is not up yet
+        // is worth waiting for rather than a reason to give up.
+        if (CalendarNotificationListener.connected) startWorker()
+        else {
+            saveOutcome("Waiting for notification access…")
+            listenerWaitUntil = System.currentTimeMillis() + LISTENER_WAIT_MILLIS
+            handler.postDelayed(listenerWait, LISTENER_POLL_MILLIS)
+        }
+        return START_STICKY
+    }
+
+    /** Waits for the notification listener before committing to an engine. */
+    private var listenerWaitUntil = 0L
+    private val listenerWait = object : Runnable {
+        override fun run() {
+            if (engine != null || stopping) return
+            if (CalendarNotificationListener.connected) { startWorker(); return }
+            if (System.currentTimeMillis() > listenerWaitUntil) {
+                requestStop("Notification access did not come back. Start the relay again.")
+                return
+            }
+            handler.postDelayed(this, LISTENER_POLL_MILLIS)
+        }
+    }
+
+    private fun startWorker() {
+        try {
             saveOutcome("Starting notification relay…")
             val loader = FlutterInjector.instance().flutterLoader()
             loader.startInitialization(applicationContext)
@@ -251,7 +287,6 @@ class CalendarRelayService : Service() {
             saveOutcome("Relay startup failed: ${error.javaClass.simpleName}")
             stopSelf()
         }
-        return START_NOT_STICKY
     }
 
     fun acceptsPackage(packageName: String): Boolean = ready && !stopping && packageName in selectedPackages
@@ -556,6 +591,23 @@ class CalendarRelayService : Service() {
         if (pending == 0) stopSelf()
     }
 
+    /**
+     * Swiping the app out of recents does not stop a foreground service on
+     * stock Android, but several OEM builds kill the process anyway. Asking to
+     * be started again costs nothing when we were not killed, and is the
+     * difference between working and not when we were.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.i(TAG, "task removed; relay wanted=${isWanted(this)} stopping=$stopping")
+        if (!stopping && isWanted(this)) {
+            runCatching {
+                val again = Intent(this, CalendarRelayService::class.java)
+                if (Build.VERSION.SDK_INT >= 26) startForegroundService(again) else startService(again)
+            }
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         ready = false
         stopping = true
@@ -574,6 +626,7 @@ class CalendarRelayService : Service() {
         unregisterReceiver(clockReceiver)
         unregisterReceiver(userPresentReceiver)
         handler.removeCallbacks(silenceTick)
+        handler.removeCallbacks(listenerWait)
         if (active === this) active = null
         handler.removeCallbacks(watchdog)
         handler.removeCallbacks(followUp)
@@ -602,8 +655,26 @@ class CalendarRelayService : Service() {
         private var cancelStart = false
         val isRunning: Boolean get() = active != null || starting
 
+        private const val PREFS = "calendar_relay"
+        private const val LISTENER_WAIT_MILLIS = 90_000L
+        private const val LISTENER_POLL_MILLIS = 1_500L
+
+        /**
+         * Whether the user wants the relay running. Android restarts a sticky
+         * service by itself, but a reboot needs this to tell "the user stopped
+         * it" apart from "something killed it".
+         */
+        fun setWanted(context: Context, wanted: Boolean) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putBoolean("wanted", wanted).apply()
+        }
+
+        fun isWanted(context: Context): Boolean = context
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("wanted", false)
+
         fun start(context: Context) {
             if (active != null || starting) return
+            setWanted(context, true)
             starting = true
             cancelStart = false
             try {
@@ -618,7 +689,10 @@ class CalendarRelayService : Service() {
 
         fun stop() {
             if (starting) cancelStart = true
-            active?.requestStop("Relay stopped.")
+            active?.let {
+                setWanted(it, false)
+                it.requestStop("Relay stopped.")
+            }
         }
 
         private const val TAG = "AirBridge"
@@ -637,6 +711,16 @@ class CalendarRelayService : Service() {
             return Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
                 ?.split(':')?.any { ComponentName.unflattenFromString(it) == expected } == true
         }
+
+        /**
+         * Whether Android has been told to leave this app alone. Without it,
+         * Doze and OEM battery management can stop the relay whenever the
+         * screen has been off for a while, whatever the service asks for.
+         */
+        fun batteryExempt(context: Context): Boolean = runCatching {
+            context.getSystemService(PowerManager::class.java)
+                .isIgnoringBatteryOptimizations(context.packageName)
+        }.getOrDefault(false)
 
         private fun bluetoothPermission(context: Context): Boolean = Build.VERSION.SDK_INT < 31 ||
             context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
@@ -657,6 +741,7 @@ class CalendarRelayService : Service() {
             "conversations" to RelayConversations.status(),
             "history" to RelayHistory.read(context).asReversed().map { it.toMap() },
             "bluetoothPermission" to bluetoothPermission(context),
+            "batteryExempt" to batteryExempt(context),
             "bluetoothEnabled" to if (bluetoothPermission(context)) runCatching {
                 context.getSystemService(BluetoothManager::class.java).adapter?.isEnabled
             }.getOrNull() else null,

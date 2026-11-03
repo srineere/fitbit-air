@@ -65,6 +65,23 @@ class _RulesPanelState extends State<RulesPanel> {
           ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 20),
+        if (!state.batteryExempt)
+          Card(
+            key: const ValueKey('battery-exemption'),
+            child: ListTile(
+              leading: const Icon(Icons.battery_alert),
+              title: const Text('Let the relay keep running'),
+              subtitle: const Text(
+                'Android battery optimisation can stop the relay once the '
+                'screen has been off for a while. Allow it to run in the '
+                'background to keep calls reaching your Air.',
+              ),
+              isThreeLine: true,
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => widget.perform(state.requestBatteryExemption),
+            ),
+          ),
+        if (!state.batteryExempt) const SizedBox(height: 12),
         ConversationPicker(controller: state, perform: widget.perform),
         const SizedBox(height: 12),
         ListTile(
