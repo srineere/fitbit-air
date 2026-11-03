@@ -48,11 +48,18 @@ class CalendarNotificationListener : NotificationListenerService() {
         // repaints the same key as an ongoing call while it is still ringing.
         // Only the ringer decides that, in CalendarRelayService's ring watch.
         val kind = RelayAlertClassifier.classify(sbn.notification, sbn.isOngoing)
+        // Who is calling, when the app says. Hashed; the number never leaves
+        // RelayCallerIdentity, and the label stays on this phone.
+        val caller = if (kind == RelayAlertKind.CALL) {
+            RelayCallerIdentity.of(sbn.packageName, sbn.notification)
+                ?.also { RelayRecentCallers.remember(it) }
+        } else null
         relay.onAlert(
             sbn.packageName, sbn.key, sbn.postTime, sbn.isOngoing,
             sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0,
             latestMessageTimestamp(sbn.notification),
-            RelayConversations.identities(sbn.packageName, sbn.notification), tone, kind
+            RelayConversations.identities(sbn.packageName, sbn.notification), tone, kind,
+            caller?.id
         )
     }
 

@@ -196,6 +196,68 @@ class RelayCallRulesTest {
         assertThrows(IllegalArgumentException::class.java) { RelayPreset.parse("one:9") }
     }
 
+    private val dialer = "com.google.android.dialer"
+
+    private fun withCallers(
+        callers: Map<String, SavedCaller>,
+        onlySaved: Boolean = false,
+    ) = RelayRuleConfig(
+        apps = mapOf(dialer to RelayAppRule(true)),
+        callers = callers,
+        onlySavedCallers = onlySaved,
+    )
+
+    @Test fun `a saved caller's own vibration outranks the app's`() {
+        val config = withCallers(mapOf("alice" to SavedCaller(dialer, "Alice", RelayPreset.DOUBLE)))
+        val match = config.match(dialer, emptySet(), null, RelayAlertKind.CALL, "alice")
+        assertEquals(RelayPreset.DOUBLE, match?.preset)
+        // More specific than an app rule, so it wins a burst.
+        assertEquals(3, match?.specificity)
+    }
+
+    @Test fun `a caller can be silenced without silencing the app`() {
+        val config = withCallers(mapOf("spam" to SavedCaller(dialer, "Spam", RelayPreset.MUTE)))
+        assertNull(config.match(dialer, emptySet(), null, RelayAlertKind.CALL, "spam"))
+        // Everyone else still rings.
+        assertEquals(
+            RelayPreset.RING,
+            config.match(dialer, emptySet(), null, RelayAlertKind.CALL, "someone")?.preset,
+        )
+    }
+
+    @Test fun `only saved callers silences the rest`() {
+        val config = withCallers(
+            mapOf("alice" to SavedCaller(dialer, "Alice")),
+            onlySaved = true,
+        )
+        assertEquals(
+            RelayPreset.RING,
+            config.match(dialer, emptySet(), null, RelayAlertKind.CALL, "alice")?.preset,
+        )
+        assertNull(config.match(dialer, emptySet(), null, RelayAlertKind.CALL, "bob"))
+    }
+
+    @Test fun `a call nobody can be attributed to still rings`() {
+        // Silencing calls an app never described would silence that app
+        // entirely, which is not what "only saved callers" promises.
+        val config = withCallers(
+            mapOf("alice" to SavedCaller(dialer, "Alice")),
+            onlySaved = true,
+        )
+        assertEquals(
+            RelayPreset.RING,
+            config.match(dialer, emptySet(), null, RelayAlertKind.CALL, null)?.preset,
+        )
+    }
+
+    @Test fun `caller rules never touch messages`() {
+        val config = withCallers(mapOf("alice" to SavedCaller(dialer, "Alice", RelayPreset.MUTE)))
+        assertEquals(
+            RelayPreset.HIGH,
+            config.match(dialer, emptySet(), null, RelayAlertKind.MESSAGE, "alice")?.preset,
+        )
+    }
+
     @Test fun `only calls may repeat`() {
         assertTrue(RelayPreset.RING.callsOnly)
         assertFalse(RelayPreset.DOUBLE.callsOnly)

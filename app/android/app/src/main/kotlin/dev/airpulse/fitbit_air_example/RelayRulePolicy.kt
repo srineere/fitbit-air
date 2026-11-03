@@ -88,6 +88,17 @@ internal data class SavedChat(
     val kind: String = "shortcut",
     val preset: RelayPreset? = null,
 )
+/**
+ * A caller the user saved, with the vibration their calls get. [preset] null
+ * uses the app's call vibration; Silent is how a specific caller is muted.
+ * [label] is a display name kept on this phone.
+ */
+internal data class SavedCaller(
+    val packageName: String,
+    val label: String,
+    val preset: RelayPreset? = null,
+)
+
 /** [tone] is the message's category when message tone is on, for history. */
 internal data class RelayMatch(val preset: RelayPreset, val specificity: Int, val tone: RelayTone? = null)
 /** Per-tone presets; null keeps the app or chat rule. Off unless the user opts in. */
@@ -133,6 +144,9 @@ internal data class RelayRuleConfig(
     val silence: RelaySilence = RelaySilence(),
     val tone: RelayToneRules = RelayToneRules(),
     val ring: RelayRingSettings = RelayRingSettings(),
+    val callers: Map<String, SavedCaller> = emptyMap(),
+    /** Only saved callers ring; everyone else is silent. */
+    val onlySavedCallers: Boolean = false,
     val everyoneElseSilent: Boolean = false,
 ) {
     val selectedPackages: Set<String> get() = apps.filterValues { it.enabled }.keys
@@ -142,13 +156,20 @@ internal data class RelayRuleConfig(
         identities: Set<String>,
         tone: RelayTone? = null,
         kind: RelayAlertKind = RelayAlertKind.MESSAGE,
+        callerId: String? = null,
     ): RelayMatch? {
         val app = apps[packageName]?.takeIf { it.enabled } ?: return null
         if (kind == RelayAlertKind.CALL) {
             // A call is from whoever is calling: saved-chat, burst and tone rules
             // all describe messages and never apply here.
-            val preset = app.callPreset ?: defaultCallPreset
-            return if (preset.silent) null else RelayMatch(preset, 2)
+            val caller = callerId?.let { callers[it] }
+            // "Only saved callers" cannot silence a call it could not attribute
+            // to anyone: that would drop every call from an app that does not
+            // say who is calling, which is not what the setting promises.
+            if (onlySavedCallers && caller == null && callerId != null) return null
+            val preset = caller?.preset ?: app.callPreset ?: defaultCallPreset
+            // A caller's own rule outranks the app's.
+            return if (preset.silent) null else RelayMatch(preset, if (caller != null) 3 else 2)
         }
         val whatsapp = packageName in RelayConversationPolicy.packages
         val saved = if (whatsapp) identities.mapNotNull { chats[it] } else emptyList()

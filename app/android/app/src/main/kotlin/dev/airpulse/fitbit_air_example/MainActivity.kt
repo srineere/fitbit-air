@@ -117,6 +117,29 @@ class MainActivity : FlutterActivity() {
                             else startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
                             result.success(null)
                         }
+                        "saveCaller" -> {
+                            val id = requireNotNull(call.argument<String>("id"))
+                            val label = call.argument<String>("label")
+                            val preset = call.argument<String>("preset")?.let { RelayPreset.parse(it) }
+                            RelayRuleStore.update(this) { config ->
+                                val existing = config.callers[id]
+                                require(existing != null || label != null) { "Unknown caller" }
+                                config.copy(callers = config.callers + (id to SavedCaller(
+                                    existing?.packageName ?: "com.google.android.dialer",
+                                    label ?: existing!!.label, preset)))
+                            }
+                            result.success(null)
+                        }
+                        "removeCaller" -> {
+                            val id = requireNotNull(call.argument<String>("id"))
+                            RelayRuleStore.update(this) { it.copy(callers = it.callers - id) }
+                            result.success(null)
+                        }
+                        "setOnlySavedCallers" -> {
+                            val only = requireNotNull(call.argument<Boolean>("only"))
+                            RelayRuleStore.update(this) { it.copy(onlySavedCallers = only) }
+                            result.success(null)
+                        }
                         "saveDefaultCallPreset" -> {
                             val preset = RelayPreset.parse(requireNotNull(call.argument<String>("preset")))
                             RelayRuleStore.update(this) { it.copy(defaultCallPreset = preset) }

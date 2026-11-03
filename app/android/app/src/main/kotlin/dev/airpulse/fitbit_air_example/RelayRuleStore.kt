@@ -31,7 +31,7 @@ internal object RelayRuleStore {
     /** [legacy] holds version 1's separately stored saved chats and "Selected" flag. */
     internal fun decode(json: JSONObject, legacy: Pair<Map<String, SavedChat>, Boolean>? = null): RelayRuleConfig {
         val version = json.getInt("version")
-        require(version == 3 || version == 2 || (version == 1 && legacy != null))
+        require(version in 2..4 || (version == 1 && legacy != null))
         val apps = json.getJSONObject("apps")
         val chats = json.getJSONObject("chats")
         val quiet = json.getJSONObject("silence")
@@ -40,6 +40,8 @@ internal object RelayRuleStore {
         fun tonePreset(key: String) = if (tone == null || tone.isNull(key)) null else RelayPreset.parse(tone.getString(key))
         // Configs saved before calls could ring decode with the shipped defaults.
         val ring = json.optJSONObject("ring")
+        // Saved callers arrived in version 4; older settings have none.
+        val callers = json.optJSONObject("callers")
         return RelayRuleConfig(
             defaultPreset = RelayPreset.parse(json.getString("defaultPreset")),
             defaultCallPreset = if (json.isNull("defaultCallPreset")) RelayPreset.RING
@@ -69,6 +71,12 @@ internal object RelayRuleStore {
                 ring.optInt("gapMillis", RelayRingSettings.DEFAULT_GAP_MILLIS),
                 ring.getInt("maxSeconds").coerceIn(10, 180),
             ),
+            callers = callers?.keys()?.asSequence()?.associateWith { id ->
+                val caller = callers.getJSONObject(id)
+                SavedCaller(caller.getString("packageName"), caller.getString("label"),
+                    if (caller.isNull("preset")) null else RelayPreset.parse(caller.getString("preset")))
+            }.orEmpty(),
+            onlySavedCallers = json.optBoolean("onlySavedCallers", false),
             everyoneElseSilent = if (version == 1) legacy!!.second else json.getBoolean("everyoneElseSilent"),
         )
     }
@@ -86,7 +94,13 @@ internal object RelayRuleStore {
                 .put("kind", chat.kind).put("preset", chat.preset?.id ?: JSONObject.NULL))
         }
         val s = config.silence
-        val json = JSONObject().put("version", 3).put("defaultPreset", config.defaultPreset.id)
+        val callers = JSONObject()
+        config.callers.forEach { (id, caller) ->
+            callers.put(id, JSONObject().put("packageName", caller.packageName)
+                .put("label", caller.label).put("preset", caller.preset?.id ?: JSONObject.NULL))
+        }
+        val json = JSONObject().put("version", 4).put("defaultPreset", config.defaultPreset.id)
+            .put("callers", callers).put("onlySavedCallers", config.onlySavedCallers)
             .put("defaultCallPreset", config.defaultCallPreset.id)
             .put("apps", apps).put("chats", chats).put("everyoneElseSilent", config.everyoneElseSilent)
             .put("silence", JSONObject().put("pauseUntil", s.pauseUntil).put("quietEnabled", s.quietEnabled)
@@ -105,7 +119,7 @@ internal object RelayRuleStore {
 
     @Synchronized fun update(context: Context, change: (RelayRuleConfig) -> RelayRuleConfig) {
         val next = change(read(context))
-        require(next.apps.size <= 128 && next.chats.size <= 64)
+        require(next.apps.size <= 128 && next.chats.size <= 64 && next.callers.size <= 128)
         require(next.selectedPackages.size <= 64)
         require(!next.defaultPreset.silent)
         // A repeat has nothing to stop it when the alert is not a ringing call.
@@ -125,6 +139,12 @@ internal object RelayRuleStore {
             "apps" to c.apps.mapValues { (_, r) ->
                 mapOf("enabled" to r.enabled, "preset" to r.preset?.id, "callPreset" to r.callPreset?.id)
             },
+            "onlySavedCallers" to c.onlySavedCallers,
+            "callers" to c.callers.map { (id, caller) ->
+                mapOf("id" to id, "packageName" to caller.packageName,
+                    "label" to caller.label, "preset" to caller.preset?.id)
+            },
+            "recentCallers" to RelayRecentCallers.list(c.callers.keys),
             "chats" to c.chats.map { (id, chat) ->
                 mapOf("id" to id, "packageName" to chat.packageName, "label" to chat.label, "kind" to chat.kind,
                     "preset" to chat.preset?.id)

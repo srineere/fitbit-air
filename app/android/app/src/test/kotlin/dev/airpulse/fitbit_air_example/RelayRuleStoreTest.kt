@@ -25,7 +25,7 @@ class RelayRuleStoreTest {
         assertEquals(RelayToneRules(), RelayRuleStore.decode(legacy).tone)
     }
     @Test(expected = IllegalArgumentException::class) fun `newer schema is not treated as an empty default`() {
-        val json = RelayRuleStore.encode(RelayRuleConfig()).put("version", 4)
+        val json = RelayRuleStore.encode(RelayRuleConfig()).put("version", 5)
         RelayRuleStore.decode(json)
     }
     @Test fun `configs saved before calls could ring decode with the shipped call defaults`() {

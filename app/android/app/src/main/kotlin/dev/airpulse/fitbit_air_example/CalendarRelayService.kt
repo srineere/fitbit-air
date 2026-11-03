@@ -291,7 +291,8 @@ class CalendarRelayService : Service() {
 
     fun acceptsPackage(packageName: String): Boolean = ready && !stopping && packageName in selectedPackages
 
-    internal fun onAlert(packageName: String, key: String, postedAt: Long, ongoing: Boolean, summary: Boolean, messageTimestamp: Long?, conversationIds: Set<String>, tone: RelayTone? = null, kind: RelayAlertKind = RelayAlertKind.MESSAGE) {
+    internal fun onAlert(packageName: String, key: String, postedAt: Long, ongoing: Boolean, summary: Boolean, messageTimestamp: Long?, conversationIds: Set<String>, tone: RelayTone? = null, kind: RelayAlertKind = RelayAlertKind.MESSAGE,
+                           callerId: String? = null) {
         if (!ready || stopping) return
         val now = System.currentTimeMillis()
         if (filter?.accept(packageName, key, postedAt, now, ongoing, summary, messageTimestamp, kind) != true) {
@@ -300,7 +301,7 @@ class CalendarRelayService : Service() {
             return
         }
         val config = RelayRuleStore.read(this)
-        val match = config.match(packageName, conversationIds, tone, kind)
+        val match = config.match(packageName, conversationIds, tone, kind, callerId)
         val category = tone?.takeIf { config.tone.enabled }
         if (match == null) {
             Log.i(TAG, "dropped pkg=$packageName kind=$kind by=rule (silent or app off)")

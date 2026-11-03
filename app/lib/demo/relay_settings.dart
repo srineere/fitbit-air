@@ -134,6 +134,29 @@ class SavedChat {
   );
 }
 
+/// A caller the user saved, with the vibration their calls get.
+class SavedCaller {
+  const SavedCaller({
+    required this.id,
+    required this.label,
+    required this.packageName,
+    this.preset,
+  });
+  final String id;
+  final String label;
+  final String packageName;
+
+  /// Null uses the app's call vibration; silent mutes this caller alone.
+  final VibrationPreset? preset;
+
+  factory SavedCaller.fromMap(Map map) => SavedCaller(
+    id: map['id'] as String,
+    label: map['label'] as String? ?? 'Caller',
+    packageName: map['packageName'] as String? ?? 'com.google.android.dialer',
+    preset: map['preset'] == null ? null : VibrationPreset.parse(map['preset']),
+  );
+}
+
 class RelaySettings {
   const RelaySettings({
     this.defaultPreset = const VibrationPreset(VibrationPattern.one),
@@ -142,6 +165,9 @@ class RelaySettings {
     this.ringMaxSeconds = 45,
     this.apps = const {},
     this.chats = const [],
+    this.callers = const [],
+    this.recentCallers = const [],
+    this.onlySavedCallers = false,
     this.everyoneElseSilent = false,
     this.pauseUntil = 0,
     this.quietEnabled = false,
@@ -163,6 +189,14 @@ class RelaySettings {
   final int ringMaxSeconds;
   final Map<String, AppNotificationRule> apps;
   final List<SavedChat> chats;
+
+  /// Callers with a rule of their own, and callers seen since the relay
+  /// started that have no rule yet.
+  final List<SavedCaller> callers;
+  final List<SavedCaller> recentCallers;
+
+  /// Only saved callers ring; calls from anyone else stay silent.
+  final bool onlySavedCallers;
 
   /// Only saved WhatsApp chats may vibrate.
   final bool everyoneElseSilent;
@@ -208,6 +242,15 @@ class RelaySettings {
         for (final chat in map['chats'] as List? ?? const [])
           SavedChat.fromMap(chat as Map),
       ],
+      callers: [
+        for (final caller in map['callers'] as List? ?? const [])
+          SavedCaller.fromMap(caller as Map),
+      ],
+      recentCallers: [
+        for (final caller in map['recentCallers'] as List? ?? const [])
+          SavedCaller.fromMap(caller as Map),
+      ],
+      onlySavedCallers: map['onlySavedCallers'] == true,
       everyoneElseSilent: map['everyoneElseSilent'] == true,
       pauseUntil: map['pauseUntil'] as int? ?? 0,
       quietEnabled: map['quietEnabled'] == true,

@@ -133,6 +133,8 @@ class _RulesPanelState extends State<RulesPanel> {
           ),
         ],
         const SizedBox(height: 12),
+        ..._callerRules(context, state, widget.perform),
+        const SizedBox(height: 12),
         ListTile(
           contentPadding: EdgeInsets.zero,
           key: const ValueKey('quiet-hours'),
@@ -646,3 +648,110 @@ Widget _alertRow({
   trailing: const Icon(Icons.chevron_right, size: 20),
   onTap: onTap,
 );
+
+/// Rules for individual callers: who always rings, and who never does.
+///
+/// Callers are learned from the calls that arrive rather than read from
+/// contacts, so the app needs no access to them. The cost is that someone has
+/// to call once before they can be given a rule.
+List<Widget> _callerRules(
+  BuildContext context,
+  DemoController state,
+  void Function(Future<void> Function()) perform,
+) {
+  final settings = state.settings;
+  final saved = settings.callers;
+  final recent = settings.recentCallers;
+
+  Future<void> edit(SavedCaller caller, {bool isNew = false}) => editVibration(
+    context,
+    state,
+    title: caller.label,
+    initial: caller.preset,
+    allowMute: true,
+    allowRing: true,
+    inheritedPreset: settings.defaultCallPreset,
+    onSave: (value) => state.saveCaller(
+      caller.id,
+      value,
+      label: isNew ? caller.label : null,
+    ),
+  );
+
+  return [
+    ExpansionTile(
+      key: const ValueKey('caller-rules'),
+      tilePadding: EdgeInsets.zero,
+      leading: const Icon(Icons.person_outline),
+      title: const Text('Callers'),
+      subtitle: Text(
+        saved.isEmpty
+            ? 'Give someone their own vibration, or silence them'
+            : '${saved.length} with their own rule'
+                  '${settings.onlySavedCallers ? " · only these ring" : ""}',
+      ),
+      children: [
+        SwitchListTile(
+          key: const ValueKey('only-saved-callers'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Only these callers ring'),
+          subtitle: const Text(
+            'Calls from anyone else stay silent. Calls the app does not '
+            'attribute to a person still ring.',
+          ),
+          value: settings.onlySavedCallers,
+          onChanged: state.changingRelay
+              ? null
+              : (value) => perform(() => state.setOnlySavedCallers(value)),
+        ),
+        for (final caller in saved)
+          ListTile(
+            key: ValueKey('caller-${caller.id}'),
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.person),
+            title: Text(caller.label),
+            subtitle: Text(
+              caller.preset?.label ??
+                  'Default: ${settings.defaultCallPreset.label}',
+            ),
+            trailing: IconButton(
+              key: ValueKey('remove-caller-${caller.id}'),
+              tooltip: 'Remove',
+              icon: const Icon(Icons.close),
+              onPressed: state.changingRelay
+                  ? null
+                  : () => perform(() => state.removeCaller(caller.id)),
+            ),
+            onTap: () => edit(caller),
+          ),
+        if (recent.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.only(top: 8, bottom: 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Recent callers'),
+            ),
+          ),
+          for (final caller in recent)
+            ListTile(
+              key: ValueKey('recent-caller-${caller.id}'),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.person_add_alt),
+              title: Text(caller.label),
+              subtitle: const Text('Tap to give them their own vibration'),
+              onTap: () => edit(caller, isNew: true),
+            ),
+        ],
+        if (saved.isEmpty && recent.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Callers appear here once they call while the relay is running. '
+              "Nothing is read from your contacts, and a caller's number is "
+              'never stored.',
+            ),
+          ),
+      ],
+    ),
+  ];
+}
