@@ -236,17 +236,23 @@ class FitbitAir {
   /// pulse merges buzzes together; below 250 ms is rejected outright. While a
   /// ring runs it holds the tracker channel, which delays Google Health.
   ///
+  /// With [pulses], stops after that many instead of running until told to.
+  /// A short fixed count is how a two-pulse pattern plays at a chosen
+  /// strength: both pulses share one session, so they land close together.
+  ///
   /// Returns how many pulses were posted and whether the original strength was
   /// verified restored. A posted pulse is not a promise one was felt.
   static Future<AirRingResult> ring({
     HapticIntensity? intensity,
     Duration gap = const Duration(milliseconds: 700),
     Duration maximum = const Duration(seconds: 45),
+    int? pulses,
   }) async => AirRingResult.fromMap(
     await _invokeMap('ring', {
       if (intensity != null) 'intensity': intensity.wireValue,
       'gapMillis': gap.inMilliseconds,
       'maxMillis': maximum.inMilliseconds,
+      if (pulses != null) 'pulses': pulses,
     }),
   );
 

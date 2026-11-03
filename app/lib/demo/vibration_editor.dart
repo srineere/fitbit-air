@@ -2,17 +2,23 @@ import 'package:flutter/material.dart';
 import 'demo_controller.dart';
 import 'relay_settings.dart';
 
+/// Picks what an alert feels like: a pattern, and the strength it plays at.
+///
+/// The two are chosen separately because every pattern can use either
+/// strength; offering each combination as its own row made a short list long
+/// and hid the choice that actually matters. Each tap saves, so there is no
+/// Save button to forget.
 Future<void> editVibration(
   BuildContext context,
   DemoController controller, {
   required String title,
   required VibrationPreset? initial,
   required Future<void> Function(VibrationPreset?) onSave,
-  bool allowDefault = true,
   bool allowMute = false,
   bool allowRing = false,
+
+  /// What this rule falls back to while nothing has been chosen for it.
   VibrationPreset? inheritedPreset,
-  String inheritLabel = 'Use default vibration',
 }) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
@@ -22,11 +28,9 @@ Future<void> editVibration(
     title: title,
     initial: initial,
     onSave: onSave,
-    allowDefault: allowDefault,
     allowMute: allowMute,
     allowRing: allowRing,
     inheritedPreset: inheritedPreset,
-    inheritLabel: inheritLabel,
   ),
 );
 
@@ -36,28 +40,29 @@ class _VibrationEditor extends StatefulWidget {
     required this.title,
     required this.initial,
     required this.onSave,
-    required this.allowDefault,
     required this.allowMute,
     required this.allowRing,
     required this.inheritedPreset,
-    required this.inheritLabel,
   });
   final DemoController controller;
   final String title;
   final VibrationPreset? initial;
   final Future<void> Function(VibrationPreset?) onSave;
-  final bool allowDefault, allowMute, allowRing;
+  final bool allowMute, allowRing;
   final VibrationPreset? inheritedPreset;
-  final String inheritLabel;
   @override
   State<_VibrationEditor> createState() => _VibrationEditorState();
 }
 
 class _VibrationEditorState extends State<_VibrationEditor> {
-  late VibrationPreset? selected = widget.initial;
+  late VibrationPreset selected =
+      widget.initial ??
+      widget.inheritedPreset ??
+      widget.controller.settings.defaultPreset;
   bool working = false;
   String? error;
   String? feedback;
+
   @override
   void initState() {
     super.initState();
@@ -74,25 +79,47 @@ class _VibrationEditorState extends State<_VibrationEditor> {
     super.dispose();
   }
 
-  Future<void> run(Future<void> Function() action, {bool save = false}) async {
+  Iterable<VibrationPattern> get _patterns => VibrationPattern.values.where(
+    (pattern) =>
+        (widget.allowRing || !pattern.callsOnly) &&
+        (widget.allowMute || pattern != VibrationPattern.silent),
+  );
+
+  /// Keeps the chosen strength while moving between patterns, so picking a
+  /// pattern never quietly changes how hard it vibrates.
+  Future<void> _choose(VibrationPreset next) async {
+    setState(() {
+      selected = next;
+      error = null;
+      feedback = null;
+      working = true;
+    });
+    try {
+      await widget.onSave(next);
+      if (mounted) setState(() => feedback = 'Saved');
+    } catch (_) {
+      if (mounted) {
+        setState(() => error = 'Could not save that. Try again.');
+      }
+    } finally {
+      if (mounted) setState(() => working = false);
+    }
+  }
+
+  Future<void> _preview() async {
     setState(() {
       working = true;
       error = null;
       feedback = null;
     });
     try {
-      await action();
-      if (!mounted) return;
-      if (save) {
-        Navigator.pop(context);
-        return;
-      }
-      setState(() => feedback = 'Command verified. Did you feel it?');
+      await widget.controller.previewPreset(selected);
+      if (mounted) setState(() => feedback = 'Sent. Did you feel it?');
     } catch (_) {
       if (mounted) {
         setState(
           () => error =
-              'Could not complete this action. Check your Air and relay status, then try again.',
+              'Could not send that. Check your Air and relay status, then try again.',
         );
       }
     } finally {
@@ -100,11 +127,19 @@ class _VibrationEditorState extends State<_VibrationEditor> {
     }
   }
 
+  bool get _canPreview =>
+      !working &&
+      !selected.isSilent &&
+      !selected.callsOnly &&
+      !widget.controller.busy &&
+      !widget.controller.previewing &&
+      !widget.controller.changingRelay &&
+      !(widget.controller.relayRunning &&
+          widget.controller.settings.silenceReason != null);
+
   @override
   Widget build(BuildContext context) {
-    final inherited =
-        widget.inheritedPreset ?? widget.controller.settings.defaultPreset;
-    final effective = selected ?? inherited;
+    final theme = Theme.of(context);
     return FractionallySizedBox(
       heightFactor: .9,
       child: ListView(
@@ -113,88 +148,92 @@ class _VibrationEditorState extends State<_VibrationEditor> {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  widget.title,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
+                child: Text(widget.title, style: theme.textTheme.headlineSmall),
               ),
               IconButton(
                 tooltip: 'Close',
-                onPressed: working ? null : () => Navigator.pop(context),
+                onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.close),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text('Choose a vibration. Trying it does not save changes.'),
-          if (widget.allowDefault)
+          const Text('Changes save as you make them.'),
+          const SizedBox(height: 8),
+          for (final pattern in _patterns)
             ListTile(
-              key: const ValueKey('preset-default'),
-              title: Text(widget.inheritLabel),
-              subtitle: Text(inherited.label),
+              key: ValueKey('pattern-${pattern.id}'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(pattern.label),
               leading: Icon(
-                selected == null
+                selected.pattern == pattern
                     ? Icons.radio_button_checked
                     : Icons.radio_button_off,
               ),
-              onTap: working ? null : () => setState(() => selected = null),
+              onTap: working
+                  ? null
+                  : () => _choose(
+                      pattern == VibrationPattern.silent
+                          ? VibrationPreset.silent
+                          : VibrationPreset(pattern, selected.strength),
+                    ),
             ),
-          for (final preset in VibrationPreset.values.where(
-            (p) =>
-                (widget.allowMute || p != VibrationPreset.mute) &&
-                (widget.allowRing || !p.callsOnly),
-          ))
-            ListTile(
-              key: ValueKey('preset-${preset.id}'),
-              title: Text(preset.label),
-              subtitle: Text(preset.description),
-              leading: Icon(
-                selected == preset
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_off,
-              ),
-              onTap: working ? null : () => setState(() => selected = preset),
+          // Strength is a property of whatever pattern is selected, so it sits
+          // under the list rather than multiplying it.
+          if (!selected.isSilent) ...[
+            const Divider(height: 32),
+            Text('Strength', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            SegmentedButton<VibrationStrength>(
+              segments: [
+                for (final strength in VibrationStrength.values)
+                  ButtonSegment(
+                    value: strength,
+                    label: Text(strength.label),
+                  ),
+              ],
+              selected: {selected.strength},
+              onSelectionChanged: working
+                  ? null
+                  : (choice) =>
+                        _choose(VibrationPreset(selected.pattern, choice.first)),
             ),
-          if (effective.intensity != null)
+            const SizedBox(height: 8),
+            Text(
+              'The Air has two strengths, and it keeps the one it was last '
+              'sent. A lighter setting here is lighter for everything until '
+              'something asks for the stronger one.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+          const SizedBox(height: 16),
+          if (selected.callsOnly)
             const Padding(
-              padding: EdgeInsets.all(12),
+              padding: EdgeInsets.only(bottom: 12),
               child: Text(
-                'Low and high change the band’s vibration strength. It keeps that strength afterward, including for other apps.',
+                'A repeat only runs while a call is actually ringing, so there '
+                'is nothing to try here. It stops as soon as the phone does.',
               ),
-            ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            key: const ValueKey('preview-rule'),
-            onPressed:
-                working ||
-                    widget.controller.busy ||
-                    widget.controller.previewing ||
-                    widget.controller.changingRelay ||
-                    (widget.controller.relayRunning &&
-                        widget.controller.settings.silenceReason != null) ||
-                    effective == VibrationPreset.mute ||
-                    effective.callsOnly
-                ? null
-                : () => run(() => widget.controller.previewPreset(effective)),
-            icon: working
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.vibration),
-            label: Text(working ? 'Working…' : 'Try this vibration'),
-          ),
-          if (effective.callsOnly)
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'A repeat only runs while a call is actually ringing, so there is nothing to try here. Each pulse opens its own connection to the Air, so expect one buzz every few seconds rather than a continuous ring.',
-              ),
+            )
+          else
+            OutlinedButton.icon(
+              key: const ValueKey('preview-rule'),
+              onPressed: _canPreview ? _preview : null,
+              icon: working
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.vibration),
+              label: Text(working ? 'Working…' : 'Try this vibration'),
             ),
           if (widget.controller.relayRunning &&
               widget.controller.settings.silenceReason != null)
-            const Text(
-              'Resume notifications or leave quiet hours before trying a vibration.',
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Resume notifications or leave quiet hours before trying a vibration.',
+              ),
             ),
           if (feedback != null)
             Semantics(liveRegion: true, child: Text(feedback!)),
@@ -203,24 +242,7 @@ class _VibrationEditorState extends State<_VibrationEditor> {
               liveRegion: true,
               child: Text(
                 error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ),
-          const SizedBox(height: 12),
-          FilledButton(
-            key: const ValueKey('save-rule'),
-            onPressed: working
-                ? null
-                : () => run(() => widget.onSave(selected), save: true),
-            child: const Text('Save'),
-          ),
-          if (widget.allowMute)
-            const Padding(
-              padding: EdgeInsets.only(top: 12),
-              child: Text(
-                'Silent stops this from vibrating at all, and is set '
-                'separately for notifications and for calls: silencing one '
-                'leaves the other alone.',
+                style: TextStyle(color: theme.colorScheme.error),
               ),
             ),
           SizedBox(height: MediaQuery.viewInsetsOf(context).bottom + 16),

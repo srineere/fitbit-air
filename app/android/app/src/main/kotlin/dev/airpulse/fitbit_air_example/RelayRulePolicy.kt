@@ -3,15 +3,72 @@ package dev.airpulse.fitbit_air_example
 import java.util.Calendar
 import java.util.TimeZone
 
-internal enum class RelayPreset(val id: String, val intensity: Int? = null) {
-    CURRENT("single"), LOW("low", 2), HIGH("high", 3), DOUBLE("double"), RING("ring", 3), MUTE("mute");
-
-    /** A repeating pulse only makes sense while something is still ringing. */
-    val callsOnly: Boolean get() = this == RING
+/** What a vibration does, independent of how hard it does it. */
+internal enum class RelayPattern(val id: String, val pulses: Int?) {
+    ONE("one", 1),
+    TWO("two", 2),
+    /** Repeats until the phone stops ringing, so it suits calls only. */
+    RING("ring", null),
+    SILENT("silent", 0);
 
     companion object {
-        fun parse(id: String): RelayPreset = entries.firstOrNull { it.id == id }
-            ?: throw IllegalArgumentException("Unknown vibration preset")
+        fun parse(id: String): RelayPattern = entries.firstOrNull { it.id == id }
+            ?: throw IllegalArgumentException("Unknown vibration pattern")
+    }
+}
+
+/**
+ * A pattern and the strength it plays at, stored as `pattern:strength`.
+ *
+ * The Air has exactly two strengths, [LOW_STRENGTH] and [FULL_STRENGTH], and
+ * every pattern can use either, so the two are chosen separately rather than
+ * enumerated as a combined list.
+ */
+internal data class RelayPreset(
+    val pattern: RelayPattern,
+    val strength: Int = FULL_STRENGTH,
+) {
+    init {
+        require(strength == LOW_STRENGTH || strength == FULL_STRENGTH) {
+            "The Air has two vibration strengths."
+        }
+    }
+
+    val id: String get() = if (silent) RelayPattern.SILENT.id else "${pattern.id}:$strength"
+
+    /** The strength to ask the Air for, or null when nothing is sent. */
+    val intensity: Int? get() = if (silent) null else strength
+
+    val silent: Boolean get() = pattern == RelayPattern.SILENT
+
+    /** A repeat has nothing to stop it unless a call is still ringing. */
+    val callsOnly: Boolean get() = pattern == RelayPattern.RING
+
+    companion object {
+        const val LOW_STRENGTH = 2
+        const val FULL_STRENGTH = 3
+
+        val MUTE = RelayPreset(RelayPattern.SILENT)
+        val LOW = RelayPreset(RelayPattern.ONE, LOW_STRENGTH)
+        val HIGH = RelayPreset(RelayPattern.ONE, FULL_STRENGTH)
+        val DOUBLE = RelayPreset(RelayPattern.TWO, FULL_STRENGTH)
+        val RING = RelayPreset(RelayPattern.RING, FULL_STRENGTH)
+
+        /** Settings written before a vibration had a strength of its own. */
+        private val legacy = mapOf(
+            "single" to HIGH, "low" to LOW, "high" to HIGH,
+            "double" to DOUBLE, "ring" to RING, "mute" to MUTE,
+        )
+
+        fun parse(id: String): RelayPreset {
+            legacy[id]?.let { return it }
+            val parts = id.split(':')
+            val pattern = RelayPattern.parse(parts.firstOrNull().orEmpty())
+            if (pattern == RelayPattern.SILENT) return MUTE
+            val strength = parts.getOrNull(1)?.toIntOrNull()
+                ?: throw IllegalArgumentException("Unknown vibration strength")
+            return RelayPreset(pattern, strength)
+        }
     }
 }
 
@@ -91,7 +148,7 @@ internal data class RelayRuleConfig(
             // A call is from whoever is calling: saved-chat, burst and tone rules
             // all describe messages and never apply here.
             val preset = app.callPreset ?: defaultCallPreset
-            return if (preset == RelayPreset.MUTE) null else RelayMatch(preset, 2)
+            return if (preset.silent) null else RelayMatch(preset, 2)
         }
         val whatsapp = packageName in RelayConversationPolicy.packages
         val saved = if (whatsapp) identities.mapNotNull { chats[it] } else emptyList()
@@ -99,15 +156,15 @@ internal data class RelayRuleConfig(
         if (whatsapp && everyoneElseSilent && saved.isEmpty()) return null
         val overrides = saved.mapNotNull { it.preset }
         // A saved mute always wins if Android supplies multiple identity forms.
-        if (RelayPreset.MUTE in overrides) return null
+        if (overrides.any { it.silent }) return null
         val base = overrides.firstOrNull() ?: app.preset ?: defaultPreset
-        if (base == RelayPreset.MUTE) return null
+        if (base.silent) return null
         val category = tone?.takeIf { this.tone.enabled }
         val toned = category?.let { this.tone.preset(it) }
         val preset = toned ?: base
         // An urgent message outranks person-specific rules within a burst.
         val specificity = if (toned != null && tone == RelayTone.URGENT) 2 else if (overrides.isEmpty()) 0 else 1
-        return if (preset == RelayPreset.MUTE) null else RelayMatch(preset, specificity, category)
+        return if (preset.silent) null else RelayMatch(preset, specificity, category)
     }
 }
 
@@ -121,6 +178,6 @@ internal data class RelayBurstChoice(val match: RelayMatch, val receivedAt: Long
 /** Migration also fails closed after backup/transfer omitted private rule settings. */
 internal fun migrateRelayRules(packages: Set<String>, style: String, migratedBefore: Boolean): RelayRuleConfig =
     if (migratedBefore) RelayRuleConfig() else RelayRuleConfig(
-        defaultPreset = if (style == "double") RelayPreset.DOUBLE else RelayPreset.CURRENT,
+        defaultPreset = if (style == "double") RelayPreset.DOUBLE else RelayPreset.HIGH,
         apps = packages.associateWith { RelayAppRule(true) },
     )

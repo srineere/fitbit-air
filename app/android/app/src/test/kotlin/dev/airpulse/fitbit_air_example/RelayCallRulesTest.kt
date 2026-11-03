@@ -170,6 +170,32 @@ class RelayCallRulesTest {
         assertNull(RelayRingWatch.reason(inComm, false, RelayRingWatch.MODE_NORMAL))
     }
 
+    @Test fun `a vibration is a pattern and a strength, chosen separately`() {
+        val twoLow = RelayPreset(RelayPattern.TWO, RelayPreset.LOW_STRENGTH)
+        assertEquals("two:2", twoLow.id)
+        assertEquals(twoLow, RelayPreset.parse("two:2"))
+        assertEquals(2, twoLow.intensity)
+        assertEquals(2, twoLow.pattern.pulses)
+        // Every pattern can take either strength.
+        assertEquals("ring:2", RelayPreset(RelayPattern.RING, RelayPreset.LOW_STRENGTH).id)
+        assertEquals("one:3", RelayPreset.HIGH.id)
+        // Silent sends nothing, so it has no strength to speak of.
+        assertTrue(RelayPreset.MUTE.silent)
+        assertNull(RelayPreset.MUTE.intensity)
+        assertEquals("silent", RelayPreset.MUTE.id)
+    }
+
+    @Test fun `settings written before strength was separate still read back`() {
+        assertEquals(RelayPreset.HIGH, RelayPreset.parse("single"))
+        assertEquals(RelayPreset.LOW, RelayPreset.parse("low"))
+        assertEquals(RelayPreset.HIGH, RelayPreset.parse("high"))
+        assertEquals(RelayPreset.DOUBLE, RelayPreset.parse("double"))
+        assertEquals(RelayPreset.RING, RelayPreset.parse("ring"))
+        assertEquals(RelayPreset.MUTE, RelayPreset.parse("mute"))
+        assertThrows(IllegalArgumentException::class.java) { RelayPreset.parse("nonsense") }
+        assertThrows(IllegalArgumentException::class.java) { RelayPreset.parse("one:9") }
+    }
+
     @Test fun `only calls may repeat`() {
         assertTrue(RelayPreset.RING.callsOnly)
         assertFalse(RelayPreset.DOUBLE.callsOnly)

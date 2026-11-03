@@ -437,7 +437,7 @@ class CalendarRelayService : Service() {
         val config = RelayRuleStore.read(this)
         check(config.silence.reason(System.currentTimeMillis()) == null) { "Resume the relay or leave quiet hours before trying a vibration." }
         val selected = preset?.let { RelayPreset.parse(it) } ?: config.defaultPreset
-        require(selected != RelayPreset.MUTE && !selected.callsOnly) { "Choose a vibration to try." }
+        require(!selected.silent && !selected.callsOnly) { "Choose a vibration to try." }
         submit(null, System.currentTimeMillis(), RelayMatch(selected, 2), completion)
     }
 
@@ -538,9 +538,14 @@ class CalendarRelayService : Service() {
         if (silence != null || System.currentTimeMillis() >= expiresAt) {
             finished(RelayWorkerResult(silence ?: "expired", null)); return
         }
+        // More than one pulse is a short bounded ring: both pulses share one
+        // session, so they land close enough together to read as a pattern,
+        // and both play at the strength the rule asked for.
+        val pulses = preset.pattern.pulses ?: 1
         channel?.invokeMethod("dispatch", mapOf(
             "id" to id, "expiresAt" to expiresAt,
-            "kind" to if (preset == RelayPreset.DOUBLE) "preview" else "tap", "intensity" to preset.intensity
+            "kind" to "tap", "intensity" to preset.intensity,
+            "pulses" to pulses, "gapMillis" to PATTERN_GAP_MILLIS,
         ), object : MethodChannel.Result {
             override fun success(result: Any?) { finished(RelayWorkerResult.decode(result)) }
             override fun error(code: String, message: String?, details: Any?) { finished(RelayWorkerResult("failed", "WORKER_ERROR")) }
@@ -698,6 +703,8 @@ class CalendarRelayService : Service() {
         private const val TAG = "AirBridge"
         private const val RING_REARM_MILLIS = 15_000L
         private const val RING_WATCH_MILLIS = 1_000L
+        /** Spacing inside a fixed pattern, close enough to feel like one alert. */
+        private const val PATTERN_GAP_MILLIS = 300
         private const val CHANNEL = "calendar_relay"
         private const val STOP = "calendar_relay.STOP"
         private const val SILENCE = "calendar_relay.SILENCE"

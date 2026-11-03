@@ -107,7 +107,7 @@ internal object RelayRuleStore {
         val next = change(read(context))
         require(next.apps.size <= 128 && next.chats.size <= 64)
         require(next.selectedPackages.size <= 64)
-        require(next.defaultPreset != RelayPreset.MUTE)
+        require(!next.defaultPreset.silent)
         // A repeat has nothing to stop it when the alert is not a ringing call.
         require(!next.defaultPreset.callsOnly && next.apps.values.none { it.preset?.callsOnly == true }) {
             "Only calls can repeat."

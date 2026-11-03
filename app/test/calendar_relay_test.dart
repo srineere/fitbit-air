@@ -645,9 +645,8 @@ void main() {
     await mount(tester);
     await tap(tester, 'nav-rules');
     await tap(tester, 'default-vibration');
-    await tap(tester, 'preset-double');
-    await tap(tester, 'save-rule');
-    expect(controller.settings.defaultPreset, VibrationPreset.doublePulse);
+    await tap(tester, 'pattern-two');
+    expect(controller.settings.defaultPreset, const VibrationPreset(VibrationPattern.two));
     expect(running, isTrue);
     expect(calls, isNot(contains('stop')));
     await tester.pumpWidget(const SizedBox());
@@ -812,7 +811,9 @@ void main() {
     await tester.pumpAndSettle();
     calls.clear();
     await tap(tester, 'test-vibration');
-    expect(calls, contains('vibrate'));
+    // Two pulses now plays as a bounded ring in one session, so both pulses
+    // land at the chosen strength instead of one per strength flip.
+    expect(calls, contains('ring'));
     expect(calls, isNot(contains('tap')));
     await tester.pumpWidget(const SizedBox());
   });
@@ -884,7 +885,7 @@ void main() {
     expect(
       find.descendant(
         of: target,
-        matching: find.textContaining('Sent · Two pulses · Urgent'),
+        matching: find.textContaining('Sent · Two pulses · Strong · Urgent'),
       ),
       findsOneWidget,
     );
@@ -967,12 +968,12 @@ void main() {
         'label': 'Alice',
         'packageName': 'com.whatsapp',
         'kind': 'shortcut',
-        'preset': 'high',
+        'preset': 'one:3',
       },
     ];
     await mount(tester);
     await tap(tester, 'conversation-picker');
-    expect(find.textContaining('One pulse · Strongest'), findsOneWidget);
+    expect(find.textContaining('One pulse · Strong'), findsOneWidget);
     await tap(tester, 'remove-chat-private-chat');
     await tap(tester, 'confirm-remove-chat');
     expect(controller.settings.chats, isEmpty);
@@ -997,23 +998,26 @@ void main() {
   });
 
   testWidgets(
-    'preset preview does not save and explicit strength is disclosed',
+    'a vibration saves as it is chosen, and previewing changes nothing',
     (tester) async {
       access = true;
       running = true;
       await mount(tester);
       await tap(tester, 'nav-rules');
       await tap(tester, 'default-vibration');
-      await tap(tester, 'preset-low');
+      // No Save button: the tap itself is the change.
+      await tap(tester, 'pattern-two');
+      expect(calls, contains('saveDefaultPreset'));
+      expect(controller.settings.defaultPreset, const VibrationPreset(VibrationPattern.two));
       expect(
-        find.textContaining('It keeps that strength afterward'),
+        find.textContaining('keeps the one it was last sent'),
         findsOneWidget,
       );
+      calls.clear();
       await tap(tester, 'preview-rule');
       expect(calls, contains('previewPreset'));
       expect(calls, isNot(contains('saveDefaultPreset')));
-      expect(controller.settings.defaultPreset, VibrationPreset.single);
-      expect(find.text('Command verified. Did you feel it?'), findsOneWidget);
+      expect(find.text('Sent. Did you feel it?'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
     },
   );

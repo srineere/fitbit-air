@@ -132,6 +132,29 @@ Future<void> airCalendarRelay() async {
     }
     if (call.method != 'dispatch') throw MissingPluginException();
     final args = Map<String, Object?>.from(call.arguments as Map);
+    final pulses = args['pulses'] as int? ?? 1;
+    // More than one pulse plays as a short bounded ring, so the pattern shares
+    // a single session and every pulse uses the strength the rule asked for.
+    if (pulses > 1) {
+      try {
+        final ring = await operations.run(
+          () => FitbitAir.ring(
+            intensity: args['intensity'] == null
+                ? null
+                : HapticIntensity.fromWireValue(args['intensity']! as int),
+            gap: Duration(milliseconds: args['gapMillis'] as int? ?? 300),
+            maximum: const Duration(seconds: 20),
+            pulses: pulses,
+          ),
+        );
+        return {
+          'status': ring.pulses >= pulses ? 'completed' : 'failed',
+          'errorCode': ring.pulses >= pulses ? null : 'PARTIAL',
+        };
+      } on FitbitAirException catch (error) {
+        return {'status': 'failed', 'errorCode': error.code};
+      }
+    }
     final result = await operations.run(
       () => dispatcher.submit(
         AirHapticCommand(

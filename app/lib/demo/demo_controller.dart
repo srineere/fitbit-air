@@ -796,7 +796,7 @@ class DemoController extends ChangeNotifier {
   }
 
   Future<void> _previewPreset(VibrationPreset preset) async {
-    if (preset == VibrationPreset.mute) {
+    if (preset.isSilent) {
       throw ArgumentError('Silent rules cannot vibrate.');
     }
     if (busy ||
@@ -824,12 +824,20 @@ class DemoController extends ChangeNotifier {
     } else {
       final id = 'preview-${preset.id}';
       actions[id] = DemoAction(() async {
-        if (preset == VibrationPreset.doublePulse) {
-          final result = await FitbitAir.vibrate();
-          if (!result.verified || !result.restored) {
+        final pulses = preset.pattern.pulses ?? 1;
+        if (pulses > 1) {
+          // One session for the whole pattern, every pulse at the chosen
+          // strength, rather than a strength flip whose pulses differ.
+          final result = await FitbitAir.ring(
+            intensity: preset.intensity,
+            gap: const Duration(milliseconds: 300),
+            maximum: const Duration(seconds: 20),
+            pulses: pulses,
+          );
+          if (result.pulses < pulses) {
             throw const FitbitAirException(
-              'UNVERIFIED',
-              'Restoration was not verified.',
+              'PARTIAL',
+              'Not every pulse was sent.',
             );
           }
         } else {

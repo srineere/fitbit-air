@@ -96,7 +96,6 @@ class _RulesPanelState extends State<RulesPanel> {
             state,
             title: 'Default vibration',
             initial: state.settings.defaultPreset,
-            allowDefault: false,
             onSave: (preset) => state.saveDefaultPreset(preset!),
           ),
         ),
@@ -113,7 +112,6 @@ class _RulesPanelState extends State<RulesPanel> {
             state,
             title: 'Default call vibration',
             initial: state.settings.defaultCallPreset,
-            allowDefault: false,
             allowMute: true,
             allowRing: true,
             onSave: (preset) => state.saveDefaultCallPreset(preset!),
@@ -264,7 +262,6 @@ class _RulesPanelState extends State<RulesPanel> {
                         allowMute: true,
                         allowRing: true,
                         inheritedPreset: state.settings.defaultCallPreset,
-                        inheritLabel: 'Use default call vibration',
                         onSave: (value) =>
                             state.saveAppRule(pkg, enabled, preset, value),
                       ),
@@ -331,7 +328,6 @@ List<Widget> _toneRules(
       title: title,
       initial: preset,
       allowMute: true,
-      inheritLabel: 'Keep app or chat vibration',
       onSave: onSave,
     ),
   );
@@ -361,10 +357,10 @@ List<Widget> _toneRules(
                   enabled: value,
                   // Suggest a starting point the first time it is switched on.
                   urgent: value && fresh
-                      ? VibrationPreset.doublePulse
+                      ? const VibrationPreset(VibrationPattern.two)
                       : s.toneUrgent,
                   negative: value && fresh
-                      ? VibrationPreset.high
+                      ? const VibrationPreset(VibrationPattern.one)
                       : s.toneNegative,
                   neutral: s.toneNeutral,
                 ),
@@ -540,9 +536,9 @@ Future<void> editQuietHours(
 
 /// Repeat timing only matters when something is actually set to repeat.
 bool _repeatsAnyCall(RelaySettings settings) =>
-    settings.defaultCallPreset == VibrationPreset.ring ||
+    settings.defaultCallPreset.pattern == VibrationPattern.ring ||
     settings.apps.values.any(
-      (rule) => rule.enabled && rule.callPreset == VibrationPreset.ring,
+      (rule) => rule.enabled && rule.callPreset?.pattern == VibrationPattern.ring,
     );
 
 Future<void> editRingTiming(

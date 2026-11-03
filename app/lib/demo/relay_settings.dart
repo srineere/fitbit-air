@@ -1,41 +1,97 @@
 import 'package:fitbit_air/fitbit_air.dart';
 
-enum VibrationPreset {
-  single('single', 'One pulse', 'Uses your current strength'),
-  low('low', 'One pulse · Low', 'The band keeps low strength afterward'),
-  high(
-    'high',
-    'One pulse · Strongest',
-    'The Air has two strengths; this is the stronger one',
-  ),
-  doublePulse('double', 'Two pulses', 'Restores your original strength'),
-  ring(
-    'ring',
-    'Ring until answered',
-    'Repeating strong pulses while the call rings',
-    callsOnly: true,
-  ),
-  mute('mute', 'Silent', 'No vibration for this chat');
+/// What a vibration does, independent of how hard it does it.
+enum VibrationPattern {
+  one('one', 'One pulse', 1),
+  two('two', 'Two pulses', 2),
+  ring('ring', 'Ring until answered', null, callsOnly: true),
+  silent('silent', 'Silent', 0);
 
-  const VibrationPreset(
+  const VibrationPattern(
     this.id,
     this.label,
-    this.description, {
+    this.pulses, {
     this.callsOnly = false,
   });
   final String id;
   final String label;
-  final String description;
+
+  /// How many pulses it plays; null repeats until the phone stops ringing.
+  final int? pulses;
 
   /// A repeat has nothing to stop it unless a call is still ringing.
   final bool callsOnly;
-  HapticIntensity? get intensity => switch (this) {
-    low => HapticIntensity.low,
-    high => HapticIntensity.high,
-    _ => null,
-  };
-  static VibrationPreset parse(Object? value) =>
-      values.firstWhere((item) => item.id == value, orElse: () => single);
+
+  static VibrationPattern parse(String id) =>
+      values.firstWhere((item) => item.id == id, orElse: () => one);
+}
+
+/// The Air has exactly two strengths, and every pattern can use either.
+enum VibrationStrength {
+  low(2, 'Light'),
+  full(3, 'Strong');
+
+  const VibrationStrength(this.wire, this.label);
+  final int wire;
+  final String label;
+
+  static VibrationStrength parse(int? wire) =>
+      wire == low.wire ? low : full;
+}
+
+/// A pattern and the strength it plays at, stored as `pattern:strength`.
+class VibrationPreset {
+  const VibrationPreset(this.pattern, [this.strength = VibrationStrength.full]);
+
+  final VibrationPattern pattern;
+  final VibrationStrength strength;
+
+  static const silent = VibrationPreset(VibrationPattern.silent);
+
+  bool get isSilent => pattern == VibrationPattern.silent;
+  bool get callsOnly => pattern.callsOnly;
+
+  String get id =>
+      isSilent ? VibrationPattern.silent.id : '${pattern.id}:${strength.wire}';
+
+  /// What to show on a row: the strength only matters when something plays.
+  String get label => isSilent ? pattern.label : '${pattern.label} · ${strength.label}';
+
+  HapticIntensity? get intensity =>
+      isSilent ? null : HapticIntensity.fromWireValue(strength.wire);
+
+  /// Accepts ids written before pattern and strength were chosen separately.
+  static VibrationPreset parse(Object? value) {
+    final id = value is String ? value : '';
+    const legacy = {
+      'single': VibrationPreset(VibrationPattern.one),
+      'low': VibrationPreset(VibrationPattern.one, VibrationStrength.low),
+      'high': VibrationPreset(VibrationPattern.one),
+      'double': VibrationPreset(VibrationPattern.two),
+      'ring': VibrationPreset(VibrationPattern.ring),
+      'mute': silent,
+    };
+    final known = legacy[id];
+    if (known != null) return known;
+    final parts = id.split(':');
+    final pattern = VibrationPattern.parse(parts.first);
+    if (pattern == VibrationPattern.silent) return silent;
+    return VibrationPreset(
+      pattern,
+      VibrationStrength.parse(
+        parts.length > 1 ? int.tryParse(parts[1]) : null,
+      ),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is VibrationPreset &&
+      other.pattern == pattern &&
+      (isSilent || other.strength == strength);
+
+  @override
+  int get hashCode => Object.hash(pattern, isSilent ? 0 : strength);
 }
 
 class AppNotificationRule {
@@ -80,8 +136,8 @@ class SavedChat {
 
 class RelaySettings {
   const RelaySettings({
-    this.defaultPreset = VibrationPreset.single,
-    this.defaultCallPreset = VibrationPreset.ring,
+    this.defaultPreset = const VibrationPreset(VibrationPattern.one),
+    this.defaultCallPreset = const VibrationPreset(VibrationPattern.ring),
     this.ringGapMillis = 700,
     this.ringMaxSeconds = 45,
     this.apps = const {},
@@ -129,7 +185,7 @@ class RelaySettings {
     return RelaySettings(
       defaultPreset: VibrationPreset.parse(map['defaultPreset']),
       defaultCallPreset: map['defaultCallPreset'] == null
-          ? VibrationPreset.ring
+          ? const VibrationPreset(VibrationPattern.ring)
           : VibrationPreset.parse(map['defaultCallPreset']),
       ringGapMillis: map['ringGapMillis'] as int? ?? 700,
       ringMaxSeconds: map['ringMaxSeconds'] as int? ?? 45,

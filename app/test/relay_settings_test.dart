@@ -54,16 +54,16 @@ void main() {
       );
       await controller.refresh();
       expect(controller.settings.toneEnabled, isTrue);
-      expect(controller.settings.toneUrgent, VibrationPreset.doublePulse);
+      expect(controller.settings.toneUrgent, const VibrationPreset(VibrationPattern.two));
       expect(controller.settings.toneNegative, isNull);
       expect(controller.settings.toneNeutral, isNull);
-      expect(controller.settings.defaultPreset, VibrationPreset.doublePulse);
+      expect(controller.settings.defaultPreset, const VibrationPreset(VibrationPattern.two));
       expect(
         controller.settings.apps['com.whatsapp']?.preset,
-        VibrationPreset.low,
+        const VibrationPreset(VibrationPattern.one, VibrationStrength.low),
       );
       final chat = controller.settings.chats.single;
-      expect(chat.preset, VibrationPreset.mute);
+      expect(chat.preset, VibrationPreset.silent);
       expect(chat.nameMatch, isTrue);
       expect(controller.settings.everyoneElseSilent, isTrue);
       expect(controller.exportJson(), isNot(contains('Private label')));
@@ -91,7 +91,7 @@ void main() {
       );
       messenger.setMockMethodCallHandler(DemoController.channel, (call) async {
         if (call.method == 'previewPreset') {
-          expect(call.arguments, {'preset': 'high'});
+          expect(call.arguments, {'preset': 'one:3'});
           started.complete();
           await delivery.future;
         }
@@ -101,7 +101,7 @@ void main() {
       });
       var completed = false;
       final future = controller
-          .previewPreset(VibrationPreset.high)
+          .previewPreset(const VibrationPreset(VibrationPattern.one))
           .then((_) => completed = true);
       await started.future;
       expect(controller.previewing, isTrue);
@@ -110,7 +110,7 @@ void main() {
       await controller.setPause(15);
       expect(paused, isTrue);
       await expectLater(
-        controller.previewPreset(VibrationPreset.low),
+        controller.previewPreset(const VibrationPreset(VibrationPattern.one, VibrationStrength.low)),
         throwsStateError,
       );
       delivery.complete();

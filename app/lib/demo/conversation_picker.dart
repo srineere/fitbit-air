@@ -75,7 +75,6 @@ Future<void> _editVibration(
   title: chat.label,
   initial: chat.preset,
   allowMute: true,
-  inheritLabel: 'App vibration',
   inheritedPreset:
       state.settings.apps[chat.packageName]?.preset ??
       state.settings.defaultPreset,

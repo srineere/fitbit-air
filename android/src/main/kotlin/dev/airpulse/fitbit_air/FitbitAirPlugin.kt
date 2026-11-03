@@ -407,7 +407,10 @@ class FitbitAirPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHa
                 val intensity = call.argument<Int>("intensity")
                 val gapMillis = (call.argument<Int>("gapMillis") ?: 700).toLong()
                 val maxMillis = (call.argument<Int>("maxMillis") ?: 45_000).toLong()
+                val pulses = call.argument<Int>("pulses")
                 when {
+                    pulses != null && pulses !in 1..100 ->
+                        result.error("INVALID_PULSES", "A ring is 1-100 pulses, or unbounded.", null)
                     intensity != null && intensity !in setOf(2, 3) ->
                         result.error("INVALID_INTENSITY", "Haptic intensity must be 2 (low) or 3 (high).", null)
                     gapMillis !in MIN_RING_GAP_MS..5_000L ->
@@ -416,7 +419,7 @@ class FitbitAirPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHa
                         result.error("INVALID_DURATION", "A ring must last 1-300 seconds.", null)
                     else -> withBluetoothPermission(result) {
                         ringStopRequested = false
-                        startOperation(result, Operation.Ring(intensity, gapMillis, maxMillis))
+                        startOperation(result, Operation.Ring(intensity, gapMillis, maxMillis, pulses))
                     }
                 }
             }
@@ -1231,7 +1234,9 @@ class FitbitAirPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHa
      */
     private fun runRing(coap: CoapEndpoint, operation: Operation.Ring) {
         val until = SystemClock.elapsedRealtime() + operation.maxMillis
-        fun ringing() = !ringStopRequested && SystemClock.elapsedRealtime() < until
+        var sent = 0
+        fun ringing() = !ringStopRequested && SystemClock.elapsedRealtime() < until &&
+            (operation.pulses == null || sent < operation.pulses)
         disposables.add(readIntensity(coap).flatMap { original ->
             val target = operation.intensity ?: original
             val body = AirHapticSettings.tap(target)
@@ -1241,6 +1246,7 @@ class FitbitAirPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHa
                 // a pulse is being prepared must not still buzz the wrist after
                 // the call is over.
                 if (!ringing()) return@defer Single.just(pulses)
+                sent++
                 val sentAt = SystemClock.elapsedRealtime()
                 postSettings(coap, body).map {
                     pulses++
@@ -1251,8 +1257,11 @@ class FitbitAirPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHa
                     Single.just(pulses)
                 }
             }
-                .flatMap { Single.timer(operation.gapMillis, TimeUnit.MILLISECONDS) }
-                .flatMap { if (ringing()) pulse() else Single.just(pulses) }
+                .flatMap { count ->
+                    if (!ringing()) Single.just(count)
+                    else Single.timer(operation.gapMillis, TimeUnit.MILLISECONDS)
+                        .flatMap { if (ringing()) pulse() else Single.just(pulses) }
+                }
             pulse().flatMap { count ->
                 // The last pulse left `target` behind; put the wearer's own
                 // strength back so the next notification feels as they set it.
@@ -1615,6 +1624,12 @@ class FitbitAirPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHa
         data object SinglePulse : Operation
         data class Tap(val intensity: Int?) : Operation
         /** Repeated pulses inside one secure session; see [runRing]. */
-        data class Ring(val intensity: Int?, val gapMillis: Long, val maxMillis: Long) : Operation
+        data class Ring(
+            val intensity: Int?,
+            val gapMillis: Long,
+            val maxMillis: Long,
+            /** Stop after this many pulses; null keeps going until stopped. */
+            val pulses: Int?,
+        ) : Operation
     }
 }
