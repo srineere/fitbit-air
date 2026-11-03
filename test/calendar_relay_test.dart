@@ -672,20 +672,6 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('switching to Lab never silently stops the relay', (
-    tester,
-  ) async {
-    access = true;
-    running = true;
-    await mount(tester);
-    await tap(tester, 'nav-lab');
-    expect(controller.secureDurationSeconds, 60);
-    expect(find.byKey(const ValueKey('secure-duration')), findsOneWidget);
-    expect(calls, isNot(contains('stop')));
-    expect(controller.relayRunning, isTrue);
-    await tester.pumpWidget(const SizedBox());
-  });
-
   testWidgets('exclusive actions require an explicit relay stop', (
     tester,
   ) async {
@@ -693,14 +679,14 @@ void main() {
     running = true;
     await mount(tester);
     await tap(tester, 'nav-device');
-    await tap(tester, 'action-pulse');
+    await tap(tester, 'action-preview');
     expect(find.byKey(const ValueKey('keep-relay')), findsOneWidget);
-    expect(calls, isNot(contains('pulse')));
+    expect(calls, isNot(contains('vibrate')));
     await tap(tester, 'keep-relay');
     expect(running, isTrue);
-    await tap(tester, 'action-pulse');
+    await tap(tester, 'action-preview');
     await tap(tester, 'stop-relay-for-operation');
-    expect(calls.indexOf('stop'), lessThan(calls.indexOf('pulse')));
+    expect(calls.indexOf('stop'), lessThan(calls.indexOf('vibrate')));
     expect(controller.trials.first['outcome'], 'completed');
     expect(running, isFalse);
     await tester.pumpWidget(const SizedBox());
@@ -829,14 +815,14 @@ void main() {
     deferStop = true;
     await mount(tester);
     await tap(tester, 'nav-device');
-    await tap(tester, 'action-pulse');
+    await tap(tester, 'action-preview');
     await tap(tester, 'stop-relay-for-operation');
     expect(calls, contains('stop'));
-    expect(calls, isNot(contains('pulse')));
+    expect(calls, isNot(contains('vibrate')));
     running = false;
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
-    expect(calls, contains('pulse'));
+    expect(calls, contains('vibrate'));
     await tester.pumpWidget(const SizedBox());
   });
 

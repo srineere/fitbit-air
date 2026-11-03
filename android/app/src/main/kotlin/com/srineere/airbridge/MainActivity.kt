@@ -347,22 +347,6 @@ class MainActivity : FlutterActivity() {
                     result.error("CALENDAR_RELAY", error.message, null)
                 }
             }
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "air_bridge/background")
-            .setMethodCallHandler { call, result ->
-                if (call.method == "startTest") {
-                    val intent = Intent(this, HeadlessHapticService::class.java)
-                    intent.putExtra("operation", call.argument<String>("operation") ?: "vibrate")
-                    try {
-                        if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent)
-                        else startService(intent)
-                        result.success(null)
-                    } catch (error: Exception) {
-                        result.error("BACKGROUND_START", error.message, null)
-                    }
-                } else if (call.method == "getLastResult") {
-                    result.success(getSharedPreferences("headless_test", MODE_PRIVATE).getString("result", null))
-                } else result.notImplemented()
-            }
     }
 
     private companion object {

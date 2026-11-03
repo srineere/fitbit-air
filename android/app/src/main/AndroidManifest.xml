@@ -17,8 +17,6 @@
         android:label="Air Bridge"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-        <service android:name=".HeadlessHapticService"
-            android:exported="false" android:foregroundServiceType="connectedDevice" />
         <service android:name=".CalendarRelayService"
             android:exported="false" android:foregroundServiceType="connectedDevice" />
         <!-- Brings back a relay the user started, after a reboot or an update.
