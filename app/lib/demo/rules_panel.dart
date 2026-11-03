@@ -196,7 +196,7 @@ class _RulesPanelState extends State<RulesPanel> {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // The checkbox decides whether this app is in play at all;
+                  // The toggle decides whether this app is in play at all;
                   // what each kind of alert feels like lives in its own row,
                   // so neither is hidden behind tapping the other.
                   ListTile(
@@ -204,7 +204,7 @@ class _RulesPanelState extends State<RulesPanel> {
                     contentPadding: EdgeInsets.zero,
                     leading: AppIcon(encoded: icon),
                     title: Text(label),
-                    trailing: Checkbox(
+                    trailing: Switch(
                       key: ValueKey('app-enabled-$pkg'),
                       value: enabled,
                       onChanged: state.changingRelay
@@ -212,7 +212,7 @@ class _RulesPanelState extends State<RulesPanel> {
                           : (value) => widget.perform(
                               () => state.saveAppRule(
                                 pkg,
-                                value ?? false,
+                                value,
                                 preset,
                                 callPreset,
                               ),
