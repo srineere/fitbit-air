@@ -25,7 +25,7 @@ class DemoAction {
 
 /// Shared by UI and tests. Conversation labels stay local and out of reports.
 class DemoController extends ChangeNotifier {
-  static const channel = MethodChannel('fitbit_air_example/calendar');
+  static const channel = MethodChannel('air_bridge/calendar');
   final actions = <String, DemoAction>{};
   Future<void> Function()? cancelCurrent;
   Map<String, Object?> transportDiagnostics = {};
@@ -1294,9 +1294,9 @@ class DemoController extends ChangeNotifier {
     'PERMISSION_DENIED' || 'BLUETOOTH_PERMISSION' =>
       'Grant Nearby devices permission using Check paired Air.',
     'NATIVE_UNAVAILABLE' =>
-      'This phone’s processor isn’t supported by Air Relay yet.',
+      'This phone’s processor isn’t supported by Air Bridge yet.',
     _ when AirFailureKind.of(code) == AirFailureKind.compatibility =>
-      'Your Air answered in an unexpected way ($code). If this keeps happening after a firmware update, check for an Air Relay update.',
+      'Your Air answered in an unexpected way ($code). If this keeps happening after a firmware update, check for an Air Bridge update.',
     _ =>
       'Operation failed ($code). Check permissions, Bluetooth and the paired Air. No automatic retry.',
   };

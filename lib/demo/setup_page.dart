@@ -206,7 +206,7 @@ class _RelaySetupPageState extends State<RelaySetupPage> {
           : needsControls
           ? controlsRequested
                 ? 'Open notification settings'
-                : 'Allow Air Relay notifications'
+                : 'Allow Air Bridge notifications'
           : step < 3
           ? 'Continue'
           : step == 3
@@ -219,7 +219,7 @@ class _RelaySetupPageState extends State<RelaySetupPage> {
         child: Scaffold(
           appBar: AppBar(
             automaticallyImplyLeading: false,
-            title: Text(step == 4 ? 'Air Relay' : 'Setup · ${step + 1} of 4'),
+            title: Text(step == 4 ? 'Air Bridge' : 'Setup · ${step + 1} of 4'),
             actions: [
               IconButton(
                 key: const ValueKey('close-setup'),
@@ -280,7 +280,7 @@ class _RelaySetupPageState extends State<RelaySetupPage> {
                           'Nearby devices',
                           state.bluetoothPermission
                               ? 'Allowed'
-                              : 'Bluetooth access lets Air Relay reach your band.',
+                              : 'Bluetooth access lets Air Bridge reach your band.',
                           state.bluetoothPermission,
                         ),
                         const Divider(height: 1),
@@ -320,7 +320,7 @@ class _RelaySetupPageState extends State<RelaySetupPage> {
                         ),
                         const Divider(height: 1),
                         permissionRow(
-                          'Show Air Relay notifications',
+                          'Show Air Bridge notifications',
                           controls
                               ? 'Allowed'
                               : skipControls
@@ -350,7 +350,7 @@ class _RelaySetupPageState extends State<RelaySetupPage> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
-                                      'How Air Relay uses your notifications',
+                                      'How Air Bridge uses your notifications',
                                       style: Theme.of(
                                         context,
                                       ).textTheme.titleSmall,
@@ -360,8 +360,8 @@ class _RelaySetupPageState extends State<RelaySetupPage> {
                               ),
                               const SizedBox(height: 8),
                               const Text(
-                                'With notification access, Air Relay reads the notifications on this phone from all apps, including their app name, title and text, also while it runs in the background. It uses them only to decide which ones vibrate your Air.\n\n'
-                                'Everything stays on this phone. Air Relay has no internet access, and never stores, uploads or shares notification content. It keeps only a short local history (app, time, result and, if you turn on Message tone, its category) and the chat names you choose.',
+                                'With notification access, Air Bridge reads the notifications on this phone from all apps, including their app name, title and text, also while it runs in the background. It uses them only to decide which ones vibrate your Air.\n\n'
+                                'Everything stays on this phone. Air Bridge has no internet access, and never stores, uploads or shares notification content. It keeps only a short local history (app, time, result and, if you turn on Message tone, its category) and the chat names you choose.',
                               ),
                               TextButton(
                                 key: const ValueKey('setup-privacy-policy'),
@@ -483,7 +483,7 @@ class _RelaySetupPageState extends State<RelaySetupPage> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Vibrations usually arrive a few seconds after a notification, while the Air is near your phone. Air Relay is unofficial: an Air firmware update can stop it until Air Relay is updated. If Google Health sync stalls, stop notifications.',
+                          'Vibrations usually arrive a few seconds after a notification, while the Air is near your phone. Air Bridge is unofficial: an Air firmware update can stop it until Air Bridge is updated. If Google Health sync stalls, stop notifications.',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: colors.onSurfaceVariant),
                         ),

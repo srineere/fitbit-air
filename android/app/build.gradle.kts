@@ -17,7 +17,7 @@ fun releaseSetting(name: String, env: String): String? =
     releaseKey.getProperty(name) ?: System.getenv(env)
 
 android {
-    namespace = "dev.airpulse.fitbit_air_example"
+    namespace = "com.srineere.airbridge"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -32,7 +32,7 @@ android {
 
     defaultConfig {
         // Final: Play and GitHub releases share this ID; it can never change.
-        applicationId = "dev.airpulse.airrelay"
+        applicationId = "com.srineere.airbridge"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

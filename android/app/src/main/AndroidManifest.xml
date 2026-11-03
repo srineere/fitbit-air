@@ -14,7 +14,7 @@
         android:allowBackup="false"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:label="Air Relay"
+        android:label="Air Bridge"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <service android:name=".HeadlessHapticService"
@@ -37,7 +37,7 @@
         </receiver>
         <service android:name=".CalendarNotificationListener"
             android:exported="true"
-            android:label="Air Relay"
+            android:label="Air Bridge"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />

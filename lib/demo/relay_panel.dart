@@ -468,7 +468,7 @@ class RelayPanel extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Air Relay hasn’t been tested with firmware ${state.firmware} yet. '
+            'Air Bridge hasn’t been tested with firmware ${state.firmware} yet. '
             'It usually keeps working. If alerts stop arriving, check for an update.',
           ),
           Align(

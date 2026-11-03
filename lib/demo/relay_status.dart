@@ -35,7 +35,7 @@ class RelayStatus {
     if (!state.bluetoothPermission) {
       return const RelayStatus(
         'Allow nearby devices',
-        'Air Relay needs Bluetooth permission to reach your band.',
+        'Air Bridge needs Bluetooth permission to reach your band.',
         recovery: RelayRecovery.setup,
       );
     }
@@ -56,7 +56,7 @@ class RelayStatus {
     if (!state.listenerConnected) {
       return const RelayStatus(
         'Notification access disconnected',
-        'Android isn’t sending notifications to Air Relay yet. Check notification access, then return here.',
+        'Android isn’t sending notifications to Air Bridge yet. Check notification access, then return here.',
         recovery: RelayRecovery.notifications,
       );
     }
@@ -124,7 +124,7 @@ class RelayStatus {
       case AirFailureKind.compatibility:
         return const RelayStatus(
           'Alerts aren’t reaching your Air',
-          'Your Air keeps answering in an unexpected way, possibly after a firmware update. An Air Relay update may be needed.',
+          'Your Air keeps answering in an unexpected way, possibly after a firmware update. An Air Bridge update may be needed.',
           recovery: RelayRecovery.update,
           attention: true,
         );
@@ -138,7 +138,7 @@ class RelayStatus {
       case AirFailureKind.temporary || AirFailureKind.unknown:
         return const RelayStatus(
           'Recent alerts weren’t confirmed',
-          'Keep the Air near your phone. Air Relay tries again with the next alert.',
+          'Keep the Air near your phone. Air Bridge tries again with the next alert.',
           attention: true,
         );
       case null:

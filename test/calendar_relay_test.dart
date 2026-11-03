@@ -443,7 +443,7 @@ void main() {
       await tap(tester, 'setup-check-air');
       await tap(tester, 'setup-next');
       expect(find.byKey(const ValueKey('setup-next')), findsNothing);
-      expect(find.text('Show Air Relay notifications'), findsOneWidget);
+      expect(find.text('Show Air Bridge notifications'), findsOneWidget);
       await tap(tester, 'setup-notification-controls');
       expect(calls, contains('allowNotificationControls'));
       expect(controller.notificationControlsAllowed, isTrue);

@@ -437,7 +437,7 @@ Future<bool> _confirmMessageTone(BuildContext context) async =>
         key: const ValueKey('message-tone-consent'),
         title: const Text('Read message text?'),
         content: const Text(
-          'Air Relay will read the text of notifications from your chosen apps to pick a vibration for urgent or negative messages.\n\n'
+          'Air Bridge will read the text of notifications from your chosen apps to pick a vibration for urgent or negative messages.\n\n'
           'The text is checked on this phone, in memory, and is never saved or sent; only the category (urgent, negative or neutral) appears in your history. '
           'It’s experimental and will sometimes misjudge a message. You can turn it off anytime.',
         ),

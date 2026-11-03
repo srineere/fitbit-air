@@ -30,7 +30,7 @@ void main() {
 @pragma('vm:entry-point')
 Future<void> airHeadlessTest() async {
   WidgetsFlutterBinding.ensureInitialized();
-  const resultChannel = MethodChannel('fitbit_air_example/headless_result');
+  const resultChannel = MethodChannel('air_bridge/headless_result');
   try {
     final operation = await resultChannel.invokeMethod<String>('getOperation');
     await Future<void>.delayed(const Duration(seconds: 15));
@@ -73,7 +73,7 @@ Future<void> airHeadlessTest() async {
 @pragma('vm:entry-point')
 Future<void> airCalendarRelay() async {
   WidgetsFlutterBinding.ensureInitialized();
-  const channel = MethodChannel('fitbit_air_example/calendar_worker');
+  const channel = MethodChannel('air_bridge/calendar_worker');
   final dispatcher = AirHapticDispatcher();
   final operations = RelayOperationQueue();
   channel.setMethodCallHandler((call) async {
@@ -188,7 +188,7 @@ class DemoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'Air Relay',
+    title: 'Air Bridge',
     debugShowCheckedModeBanner: false,
     theme: airRelayTheme(Brightness.light),
     darkTheme: airRelayTheme(Brightness.dark),
@@ -680,7 +680,7 @@ class _DemoPageState extends State<DemoPage> with WidgetsBindingObserver {
         return;
       }
       await const MethodChannel(
-        'fitbit_air_example/background',
+        'air_bridge/background',
       ).invokeMethod<void>('startTest', {
         'operation': readOnly ? 'readDeviceInfo' : 'vibrate',
       });
@@ -696,7 +696,7 @@ class _DemoPageState extends State<DemoPage> with WidgetsBindingObserver {
         await Future<void>.delayed(const Duration(seconds: 1));
         if (!mounted) return;
         final outcome = await const MethodChannel(
-          'fitbit_air_example/background',
+          'air_bridge/background',
         ).invokeMethod<String>('getLastResult');
         if (outcome != null) {
           receivedOutcome = true;
@@ -1252,18 +1252,18 @@ class _DemoPageState extends State<DemoPage> with WidgetsBindingObserver {
                   AirRelayMark(size: 34),
                   SizedBox(width: 12),
                   Flexible(
-                    child: Text('Air Relay', overflow: TextOverflow.ellipsis),
+                    child: Text('Air Bridge', overflow: TextOverflow.ellipsis),
                   ),
                 ],
               ),
               actions: [
                 IconButton(
                   key: const ValueKey('about-air-relay'),
-                  tooltip: 'About Air Relay',
+                  tooltip: 'About Air Bridge',
                   icon: const Icon(Icons.info_outline),
                   onPressed: () => showAboutDialog(
                     context: context,
-                    applicationName: 'Air Relay',
+                    applicationName: 'Air Bridge',
                     applicationVersion: DemoController.appVersion,
                     applicationIcon: const AirRelayMark(size: 48),
                     children: [
@@ -1275,7 +1275,7 @@ class _DemoPageState extends State<DemoPage> with WidgetsBindingObserver {
                         'Good to know:\n'
                         '• Vibrations usually arrive a few seconds after the notification.\n'
                         '• The Air must be near your phone; missed alerts are not replayed.\n'
-                        '• Air Relay uses an undocumented interface of the Air. A firmware update can stop it from working until Air Relay is updated.',
+                        '• Air Bridge uses an undocumented interface of the Air. A firmware update can stop it from working until Air Bridge is updated.',
                       ),
                       const SizedBox(height: 12),
                       Text(

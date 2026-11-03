@@ -31,7 +31,7 @@ void main() {
         MaterialApp(
           theme: airRelayTheme(brightness),
           home: Scaffold(
-            appBar: AppBar(title: const Text('Air Relay')),
+            appBar: AppBar(title: const Text('Air Bridge')),
             body: RelayPanel(
               controller: controller,
               perform: (_) {},
